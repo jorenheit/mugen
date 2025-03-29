@@ -50,7 +50,7 @@
 }
 
 [microcode] {
-	x:0:xxxx    >
+	x:0:xxxx    > LD_FB
 	
 	PLUS:1:x00x > INC, RS0, VE, LD_FA
 	PLUS:2:x00x > INC, RS2, CR
