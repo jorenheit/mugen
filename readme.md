@@ -35,12 +35,12 @@ Defines all control signals used in the microcode.
 
 ```
 [signals] {
-    HLT,
-    MI,
-    RI,
-    RO,
-    IO,
-    II,
+    HLT
+    MI
+    RI
+    RO
+    IO
+    II
     ...
 }
 ```
@@ -51,9 +51,9 @@ Assigns numerical values to each instruction.
 
 ```
 [opcodes] {
-    LDA  = 0x01
-    ADD  = 0x02
-    OUT  = 0x0e
+    LDA = 0x01
+    ADD = 0x02
+    OUT = 0x0e
     ...
 }
 ```
