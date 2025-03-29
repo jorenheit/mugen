@@ -36,6 +36,15 @@ namespace Mugen {
 
     int lineNr = 0;
 
+    void validateIdentifier(std::string const &ident) {
+	for (char c : ident) {
+	    error_if(std::isspace(c),
+		     "Identifier \"", ident, "\" can not contain whitespace.");
+	    error_if(!std::isalnum(c) && c != '_',
+		     "Identifier \"", ident, "\" contains invalid character: '", c, "'.");
+	}
+    }
+    
     std::vector<std::string> parseSignals(Body const &body) {
         std::istringstream iss(body.str);
         std::vector<std::string> result;
@@ -43,45 +52,48 @@ namespace Mugen {
         lineNr = body.lineNr;
         while (std::getline(iss, line)) {
 	    trim(line);
-	    for (char c: line) {
-		error_if(std::isspace(c), "signal identifier may not contain spaces.");
+	    if (line.empty()) {
+		++lineNr;
+		continue;
 	    }
-	    if (!line.empty()) result.push_back(line);
+
+	    validateIdentifier(line);
+	    result.push_back(line);
 	    ++lineNr;
         }
         
         return result;
     }
 
-
-
-    Opcode constructOpcode(std::vector<std::string> const &operands, int const lineNr) {
-        error_if (operands.size() != 2, "incorrect opcode format, should be of the form [OPCODE] = [HEX VALUE].");
-        for (char c: operands[0]) {
-	    error_if(std::isspace(c), "opcode identifier may not contain spaces.");
-        }
-        
-        size_t value = 0;
-        try {
-	    value = std::stoi(operands[1], nullptr, 16);
-        }
-        catch (...) {
-	    error("value assigned to opcode ", operands[1], " is not a valid hexadecimal number.");
-        }
-        
-        return {operands[0], value};
-    }
-
     std::vector<Opcode> parseOpcodes(Body const &body) {
+	auto constructOpcode = [](std::string const &lhs, std::string const &rhs) -> Opcode {
+	    validateIdentifier(lhs);
+	    size_t value = 0;
+	    try { value = std::stoi(rhs, nullptr, 16); } catch (...) {
+		error("value assigned to opcode ", rhs, " is not a valid hexadecimal number.");
+	    }
+	    return {lhs, value};
+	};
+
+	
         std::istringstream iss(body.str);
         std::vector<Opcode> result;
         std::string line;
         lineNr = body.lineNr;
         while (std::getline(iss, line)) {
 	    trim(line);
-	    if (!line.empty()) {
-		result.push_back(constructOpcode(split(line, '='), lineNr));
+	    if (line.empty()) {
+		++lineNr;
+		continue;
 	    }
+
+
+	    std::vector<std::string> operands = split(line, '=');
+	    error_if (operands.size() != 2,
+		      "incorrect opcode format, should be of the form [OPCODE] = [HEX VALUE].");
+
+	    Opcode oc = constructOpcode(operands[0], operands[1]);
+	    result.push_back(oc);
 	    ++lineNr;
         }
         return result;
@@ -90,25 +102,27 @@ namespace Mugen {
 
 
     AddressMapping parseAddressMapping(Body const &body) {
+	
         std::istringstream iss(body.str);
         AddressMapping result;
         lineNr = body.lineNr;   
         std::string line;
         int count = 0;
-        while (std::getline(iss, line)) {
+
+	while (std::getline(iss, line)) {
 	    trim(line);
 	    if (line.empty()) {
 		++lineNr;
 		continue;
 	    }
 
-	    auto operands = split(line, ':');
+	    std::vector<std::string> operands = split(line, ':');
 	    error_if(operands.size() != 2, "invalid format for address specifier, should be [IDENTIFIER]: [NUMBER OF BITS].");
-                        
+
 	    int bits = 0;
-	    try { bits = std::stoi(operands[1]); }
-	    catch (...) {
-		error("specified number of bits (", operands[1], ") is not a valid decimal number.");
+	    std::string rhs = operands[1];
+	    try { bits = std::stoi(rhs); } catch (...) {
+		error("specified number of bits (", rhs, ") is not a valid decimal number.");
 	    }
 	    error_if(bits <= 0, "number of bits must be a positive integer.");
                         
@@ -140,12 +154,14 @@ namespace Mugen {
 
 
     RomSpecs parseRomSpecs(Body const &body) {
+
         std::istringstream iss(body.str);
         lineNr = body.lineNr;
         RomSpecs result;
         bool done = false;
         std::string line;
-        while (std::getline(iss, line)) {
+
+	while (std::getline(iss, line)) {
 	    trim(line);
 	    if (line.empty()) {
 		++lineNr;
