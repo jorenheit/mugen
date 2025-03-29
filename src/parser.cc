@@ -66,7 +66,7 @@ namespace Mugen {
 	    value = std::stoi(operands[1], nullptr, 16);
         }
         catch (...) {
-	    error_if(true, "value assigned to opcode ", operands[1], " is not a valid hexadecimal number.");
+	    error("value assigned to opcode ", operands[1], " is not a valid hexadecimal number.");
         }
         
         return {operands[0], value};
@@ -97,44 +97,40 @@ namespace Mugen {
         int count = 0;
         while (std::getline(iss, line)) {
 	    trim(line);
-	    if (!line.empty()) {
-		auto operands = split(line, ':');
-		error_if(operands.size() != 2, "invalid format for address specifier, should be [IDENTIFIER]: [NUMBER OF BITS].");
-                        
-		int bits = 0;
-		try {
-		    bits = std::stoi(operands[1]);
-		}
-		catch (...) {
-		    error_if(true, "specified number of bits (", operands[1], ") is not a valid decimal number.");
-		}
-		error_if(bits <= 0, "number of bits must be a positive integer.");
-                        
-		std::string const &ident = operands[0];
-		if (ident == "cycle") {
-		    error_if(result.cycle_bits > 0, "multiple definitions of cycle bits.");
-                                
-		    result.cycle_bits = bits;
-		    result.cycle_bits_start = count;
-		}
-		else if (ident == "opcode") {
-		    error_if(result.opcode_bits > 0, "multiple definitions of opcode bits.");
-                                
-		    result.opcode_bits = bits;
-		    result.opcode_bits_start = count;
-		}
-		else if (ident == "flags") {
-		    error_if(result.flag_bits > 0, "multiple definitions of flag bits.");
-                                
-		    result.flag_bits = bits;
-		    result.flag_bits_start = count;
-		}
-		else {
-		    error_if(true, "unknown identifier ", ident, ".");
-		}
-                        
-		count += bits;
+	    if (line.empty()) {
+		++lineNr;
+		continue;
 	    }
+
+	    auto operands = split(line, ':');
+	    error_if(operands.size() != 2, "invalid format for address specifier, should be [IDENTIFIER]: [NUMBER OF BITS].");
+                        
+	    int bits = 0;
+	    try { bits = std::stoi(operands[1]); }
+	    catch (...) {
+		error("specified number of bits (", operands[1], ") is not a valid decimal number.");
+	    }
+	    error_if(bits <= 0, "number of bits must be a positive integer.");
+                        
+	    std::string const &ident = operands[0];
+	    if (ident == "cycle") {
+		error_if(result.cycle_bits > 0, "multiple definitions of cycle bits.");
+		result.cycle_bits = bits;
+		result.cycle_bits_start = count;
+	    }
+	    else if (ident == "opcode") {
+		error_if(result.opcode_bits > 0, "multiple definitions of opcode bits.");
+		result.opcode_bits = bits;
+		result.opcode_bits_start = count;
+	    }
+	    else if (ident == "flags") {
+		error_if(result.flag_bits > 0, "multiple definitions of flag bits.");
+		result.flag_bits = bits;
+		result.flag_bits_start = count;
+	    }
+	    else error("unknown identifier ", ident, ".");
+                        
+	    count += bits;
 	    ++lineNr;
         }
 
@@ -151,29 +147,31 @@ namespace Mugen {
         std::string line;
         while (std::getline(iss, line)) {
 	    trim(line);
-	    if (!line.empty()) {
-		error_if(done, "rom specification can only contain one line.");
+	    if (line.empty()) {
+		++lineNr;
+		continue;
+	    }
+	    error_if(done, "rom specification can only contain at most 1 non-empty line.");
                         
-		std::vector<std::string> values = split(line, 'x');
-		error_if(values.size() != 2, "invalid format for rom specification, should be [NUMBER OF WORDS]x[BITS_PER_WORD].");
-                
-		try {
-		    result.word_count = std::stoi(values[0]);
-		}
-		catch (...) {
-		    error_if(true, "specified number of words (", values[0], ") is not a valid decimal number.");
+	    std::vector<std::string> values = split(line, 'x');
+	    error_if(values.size() != 2, "invalid format for rom specification, should be [NUMBER OF WORDS]x[BITS_PER_WORD].");
+
+	    // Get number of words
+	    {
+		try { result.word_count = std::stoi(values[0]); } catch (...) {
+		    error("specified number of words (", values[0], ") is not a valid decimal number.");
 		}
 		error_if(result.word_count <= 0, "specified number of words (", result.word_count, ") must be a positive integer.");
-                        
-		try {
-		    result.bits_per_word = std::stoi(values[1]);
-		}
-		catch (...) {
-		    error_if(true, "specified number of bits per word (", values[1], ") is not a valid decimal number.");
+	    }
+	    // Get bits per word
+	    {
+		try { result.bits_per_word = std::stoi(values[1]); } catch (...) {
+		    error("specified number of bits per word (", values[1], ") is not a valid decimal number.");
 		}
 		error_if(result.bits_per_word != 8, "only 8 bit words are currently supported.");
-		done = true;
 	    }
+	    
+	    done = true;
 	    ++lineNr;
         }
         
@@ -204,33 +202,35 @@ namespace Mugen {
         int bodyLineNr;
         bool isFirstCharacterOfBody;
         char ch;
+	
         while (file.get(ch)) {
-	    if (ch == '\n') {
-		++lineNr;
+	    if (ch == '\n') ++lineNr;
+
+	    switch (state) {
+	    case PARSING_TOP_LEVEL: {
+		if (ch == '[') state = PARSING_SECTION_HEADER;
+		break; // ignore all other characters at top level
 	    }
-                
-	    if (state == PARSING_TOP_LEVEL) {
-		if (ch == '[') {
-		    state = PARSING_SECTION_HEADER;
-		}
+	    case PARSING_SECTION_HEADER: {
+		error_if(ch == '{' || ch == '}',
+			 "expected closing bracket ']' before '", ch, "' in section header.");
+
+		if (ch == ']') state = LOOKING_FOR_OPENING_BRACE;
+		else currentSection += ch;
+		break;
 	    }
-	    else if (state == PARSING_SECTION_HEADER) {
-		error_if(ch == '{' || ch == '}', "expected closing bracket ']' before '", ch, "' in section header.");
-		if (ch == ']') {
-		    state = LOOKING_FOR_OPENING_BRACE;
-		}
-		else {
-		    currentSection += ch;
-		}
-	    }
-	    else if (state == LOOKING_FOR_OPENING_BRACE) {
-		if (std::isspace(ch)) continue;
-		error_if(ch != '{', "expected opening brace '{' before '", ch, "' in section definition.");
+	    case LOOKING_FOR_OPENING_BRACE: {
+		if (std::isspace(ch)) break;
+		error_if(ch != '{',
+			 "expected opening brace '{' before '", ch, "' in section definition.");
+		
 		state = PARSING_SECTION_BODY;
 		isFirstCharacterOfBody = true;
+		break;
 	    }
-	    else if (state == PARSING_SECTION_BODY) {
-		error_if(ch == '[', "expected closing brace '}' before '", ch, "' in section definition.");
+	    case PARSING_SECTION_BODY: {
+		error_if(ch == '[',
+			 "expected closing brace '}' before '", ch, "' in section definition.");
                         
 		if (ch != '}') {
 		    if (!std::isspace(ch) && isFirstCharacterOfBody) {
@@ -247,12 +247,19 @@ namespace Mugen {
 		    currentBody.clear();
 		    state = PARSING_TOP_LEVEL;
 		}
-	    }
+	    }}
         }
-        
-        error_if(state == PARSING_SECTION_HEADER, "expected closing bracket ']' in section header.");
-        error_if(state == LOOKING_FOR_OPENING_BRACE, "expected opening brace '{' in section definition.");
-        error_if(state == PARSING_SECTION_BODY, "expecting closing brace '}' in section definition.");
+
+	// After parsing the entire file, state should be back to TOP_LEVEL
+	
+        error_if(state == PARSING_SECTION_HEADER,
+		 "expected closing bracket ']' in section header.");
+
+        error_if(state == LOOKING_FOR_OPENING_BRACE,
+		 "expected opening brace '{' in section definition.");
+
+        error_if(state == PARSING_SECTION_BODY,
+		 "expecting closing brace '}' in section definition.");
 
         return result;
     }
@@ -277,9 +284,8 @@ namespace Mugen {
 	    break;
 	}
 	default: {
-	    // UNREACHABLE
-	}
-        }
+	    error("UNREACHABLE");
+	}}
     }
 
 
@@ -303,106 +309,101 @@ namespace Mugen {
         
         while (std::getline(iss, line)) {
 	    trim(line);
-	    if (!line.empty()) {
-		std::vector<std::string> operands = split(line, '>');
-		if (operands.size() == 1) { operands.push_back(""); }
-		std::vector<std::string> lhs = operands.size() ? split(operands[0], ':') : std::vector<std::string>{};
+	    if (line.empty()) {
+		++lineNr;
+		continue;
+	    }
+	    
+	    std::vector<std::string> operands = split(line, '>');
+	    if (operands.size() == 1) operands.push_back("");
+	    
+	    std::vector<std::string> lhs = operands.size() ? split(operands[0], ':') : std::vector<std::string>{};
+	    error_if(operands.size() != 2 || lhs.size() != 3, 
+		     "invalid format in microcode definition, should be [OPCODE]:[CYCLE]:[FLAGS] > [SIG1], ...");
                         
-		error_if(operands.size() != 2 || lhs.size() != 3, 
-			 "invalid format in microcode definition, should be [OPCODE]:[CYCLE]:[FLAGS] > [SIG1], ...");
-                        
-		// Build address string
-		std::string addressString(rom.address_bits, 'x');
-                        
-		// Insert opcode into address string
-		{
-		    std::string userStr = lhs[0];
+	    // Build address string
+	    std::string addressString(rom.address_bits, 'x');
+
+	    // Lambda for inserting bits into the address-string
+	    auto insertIntoAddressString = [&](std::string const &bitString, int bits_start, int n_bits) {
+		addressString.replace(rom.address_bits - bits_start - n_bits, n_bits, bitString);
+	    };
+	    
+	    // Insert opcode into address string
+	    {
+		std::string userStr = lhs[0];
+		if (userStr != "x") {
 		    std::string opcodeStr;
-		    if (userStr == "x") {
-			opcodeStr = std::string(mapping.opcode_bits, 'x');
-		    }
-		    else {
-			for (Opcode const &oc: opcodes) {
-			    if (userStr == oc.ident) {
-				opcodeStr = toBinaryString(oc.value, mapping.opcode_bits);
-				error_if(opcodeStr.length() > mapping.opcode_bits,
-					 "value assigned to opcode ", userStr, " (", oc.value, ") does not fit inside ", mapping.opcode_bits, " bits.");
-				break;
-			    }
-			}
-		    }
-		    error_if(opcodeStr.empty(), "opcode ", userStr, " not declared in opcode section.");
-		    int pos = rom.address_bits - mapping.opcode_bits_start - mapping.opcode_bits;
-		    int count = mapping.opcode_bits;
-		    addressString.replace(pos, count, opcodeStr);
-		}
-                        
-		// Insert cycle into address string
-		{
-		    std::string userStr = lhs[1];
-		    std::string cycleStr;
-		    if (userStr == "x") {
-			cycleStr = std::string(mapping.cycle_bits, 'x');
-		    }
-		    else {
-			int value;
-			try {
-			    value = std::stoi(userStr);
-			}
-			catch (...) {
-			    error_if(true, "cycle number (", userStr, ") is not a valid decimal number.");
-			}
-			cycleStr = toBinaryString(value, mapping.cycle_bits);
-			error_if(cycleStr.length() > mapping.cycle_bits, 
-				 "cycle number (", value, ") does not fit inside ", mapping.cycle_bits, " bits");
-		    }
-                                
-		    int pos = rom.address_bits - mapping.cycle_bits_start - mapping.cycle_bits;
-		    int count = mapping.cycle_bits;
-		    addressString.replace(pos, count, cycleStr);
-		}
-                        
-		// Insert flag bits into address string
-		{
-		    std::string flagStr = lhs[2];
-		    error_if(flagStr.length() != mapping.flag_bits, 
-			     "number of flag bits (", flagStr.length(), ") does not match number of flag bits defined in the address section (", mapping.flag_bits, ")");
-                                
-		    for (char c: flagStr) { 
-			error_if(c != '0' && c != '1' && c != 'x', "invalid flag bit '", c,"'; can only be 0, 1 or x (wildcard).");
-		    }
-                                
-		    int pos = rom.address_bits - mapping.flag_bits_start - mapping.flag_bits;
-		    int count = mapping.flag_bits;
-		    addressString.replace(pos, count, flagStr);
-		}
-                        
-		// Construct control signal bitvector                   
-		std::vector<std::string> rhs = split(operands[1], ',');
-		size_t bitvector = 0;
-		for (std::string const &signal: rhs) {
-		    bool match = false;
-		    for (size_t idx = 0; idx != signals.size(); ++idx) {
-			if (signal == signals[idx]) {
-			    bitvector |= (1 << idx);
-			    match = true;
+		    for (Opcode const &oc: opcodes) {
+			if (userStr == oc.ident) {
+			    opcodeStr = toBinaryString(oc.value, mapping.opcode_bits);
+			    error_if(opcodeStr.length() > mapping.opcode_bits,
+				     "value assigned to opcode ", userStr, " (", oc.value, ") does not fit inside ", mapping.opcode_bits, " bits.");
 			    break;
 			}
 		    }
-		    error_if(!match, "signal ", signal, " not declared in signal section.");
+		    error_if(opcodeStr.empty(), "opcode ", userStr, " not declared in opcode section.");
+		    insertIntoAddressString(opcodeStr, mapping.opcode_bits_start, mapping.opcode_bits);
 		}
+	    }
                         
-		// Assign bitvector to all matching indices
-		std::vector<size_t> matchedIndices;
-		findMatches(addressString, matchedIndices);
-                        
-		for (size_t idx: matchedIndices) {
-		    if (!visited[idx]) {
-			for (size_t part = 0; part != nParts; ++part) {
-			    images[part][idx] = (bitvector >> (8 * part)) & 0xff;
-			}
-			visited[idx] = true;
+	    // Insert cycle into address string
+	    {
+		std::string userStr = lhs[1];
+		if (userStr != "x") {
+		    std::string cycleStr;
+		    int value;
+		    try { value = std::stoi(userStr); } catch (...) {
+			error("cycle number (", userStr, ") is not a valid decimal number.");
 		    }
+		    cycleStr = toBinaryString(value, mapping.cycle_bits);
+		    error_if(cycleStr.length() > mapping.cycle_bits, 
+			     "cycle number (", value, ") does not fit inside ", mapping.cycle_bits, " bits");
+		    insertIntoAddressString(cycleStr, mapping.cycle_bits_start, mapping.cycle_bits);
+		}
+
+	    }
+                        
+	    // Insert flag bits into address string
+	    {
+		std::string flagStr = lhs[2];
+		error_if(flagStr.length() != mapping.flag_bits, 
+			 "number of flag bits (", flagStr.length(), ") does not match number of flag bits defined in the address section (", mapping.flag_bits, ")");
+                                
+		for (char c: flagStr) { 
+		    error_if(c != '0' && c != '1' && c != 'x',
+			     "invalid flag bit '", c,"'; can only be 0, 1 or x (wildcard).");
+		}
+
+		insertIntoAddressString(flagStr, mapping.flag_bits_start, mapping.flag_bits);
+	    }
+                        
+	    // Construct control signal bitvector                   
+	    std::vector<std::string> rhs = split(operands[1], ',');
+	    size_t bitvector = 0;
+	    for (std::string const &signal: rhs) {
+		bool match = false;
+		for (size_t idx = 0; idx != signals.size(); ++idx) {
+		    if (signal == signals[idx]) {
+			bitvector |= (1 << idx);
+			match = true;
+			break;
+		    }
+		}
+		error_if(!match,
+			 "signal ", signal, " not declared in signal section.");
+	    }
+                        
+	    // Assign bitvector to all matching indices
+	    std::vector<size_t> matchedIndices;
+	    findMatches(addressString, matchedIndices);
+                        
+	    for (size_t idx: matchedIndices) {
+		if (!visited[idx]) {
+		    for (size_t part = 0; part != nParts; ++part) {
+			images[part][idx] = (bitvector >> (8 * part)) & 0xff;
+		    }
+		    visited[idx] = true;
 		}
 	    }
                 
@@ -431,7 +432,7 @@ namespace Mugen {
 	    else if (pr.first == "microcode") microcodeDefined = true;
 	    else {
 		lineNr = pr.second.lineNr;
-		error_if(true, "invalid section \"", pr.first, "\".");
+		error("invalid section \"", pr.first, "\".");
 	    }
         }
 
