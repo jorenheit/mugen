@@ -90,15 +90,15 @@ Describes the control signals for each instruction cycle. Each line specificies 
 ```
 [microcode] {
     x:0:xx > MI, CO
-		x:1:xx > RO, II, CE
+    x:1:xx > RO, II, CE
 		
-		NOP:2:xx > 
-		NOP:3:xx >
-		NOP:4:xx >
+    NOP:2:xx >
+    NOP:3:xx >
+    NOP:4:xx >
 		
-		LDA:2:xx > MI, IO
-		LDA:3:xx > RO, AI
-		LDA:4:xx > 
+    LDA:2:xx > MI, IO
+    LDA:3:xx > RO, AI
+    LDA:4:xx > 
 }
 ```
 
