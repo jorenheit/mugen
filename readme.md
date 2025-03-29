@@ -34,13 +34,13 @@ Defines all control signals used in the microcode.
 
 ```
 [signals] {
-	HLT,
-	MI,
-	RI,
-	RO,
-	IO,
-	II,
-	...
+    HLT,
+    MI,
+    RI,
+    RO,
+    IO,
+    II,
+    ...
 }
 ```
 The first signal will appear as the least significant bit in the resulting control signal configurations.
