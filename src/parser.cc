@@ -68,11 +68,10 @@ namespace Mugen {
     std::vector<Opcode> parseOpcodes(Body const &body) {
 	auto constructOpcode = [](std::string const &lhs, std::string const &rhs) -> Opcode {
 	    validateIdentifier(lhs);
-	    size_t value = 0;
-	    try { value = std::stoi(rhs, nullptr, 16); } catch (...) {
-		error("value assigned to opcode ", rhs, " is not a valid hexadecimal number.");
-	    }
-	    return {lhs, value};
+	    int value;
+	    error_if(!stringToInt(rhs, value, 16),
+		     "value assigned to opcode ", rhs, " is not a valid hexadecimal number.");
+	    return {lhs, static_cast<size_t>(value)};
 	};
 
 	
@@ -119,11 +118,10 @@ namespace Mugen {
 	    std::vector<std::string> operands = split(line, ':');
 	    error_if(operands.size() != 2, "invalid format for address specifier, should be [IDENTIFIER]: [NUMBER OF BITS].");
 
-	    int bits = 0;
 	    std::string rhs = operands[1];
-	    try { bits = std::stoi(rhs); } catch (...) {
-		error("specified number of bits (", rhs, ") is not a valid decimal number.");
-	    }
+	    int bits;
+	    error_if(!stringToInt(rhs, bits),
+		     "specified number of bits (", rhs, ") is not a valid decimal number.");
 	    error_if(bits <= 0, "number of bits must be a positive integer.");
                         
 	    std::string const &ident = operands[0];
@@ -174,16 +172,14 @@ namespace Mugen {
 
 	    // Get number of words
 	    {
-		try { result.word_count = std::stoi(values[0]); } catch (...) {
-		    error("specified number of words (", values[0], ") is not a valid decimal number.");
-		}
+		error_if(!stringToInt(values[0], result.word_count),
+			 "specified number of words (", values[0], ") is not a valid decimal number.");
 		error_if(result.word_count <= 0, "specified number of words (", result.word_count, ") must be a positive integer.");
 	    }
 	    // Get bits per word
 	    {
-		try { result.bits_per_word = std::stoi(values[1]); } catch (...) {
-		    error("specified number of bits per word (", values[1], ") is not a valid decimal number.");
-		}
+		error_if(!stringToInt(values[1], result.bits_per_word),
+			 "specified number of bits per word (", values[1], ") is not a valid decimal number.");
 		error_if(result.bits_per_word != 8, "only 8 bit words are currently supported.");
 	    }
 	    
@@ -369,12 +365,13 @@ namespace Mugen {
 		if (userStr != "x") {
 		    std::string cycleStr;
 		    int value;
-		    try { value = std::stoi(userStr); } catch (...) {
-			error("cycle number (", userStr, ") is not a valid decimal number.");
-		    }
+		    error_if(!stringToInt(userStr, value),
+			     "cycle number (", userStr, ") is not a valid decimal number.");
+
 		    cycleStr = toBinaryString(value, mapping.cycle_bits);
 		    error_if(cycleStr.length() > mapping.cycle_bits, 
 			     "cycle number (", value, ") does not fit inside ", mapping.cycle_bits, " bits");
+		    
 		    insertIntoAddressString(cycleStr, mapping.cycle_bits_start, mapping.cycle_bits);
 		}
 
