@@ -8,6 +8,7 @@ Mugen is a microcode generator that converts a structured specification file int
 To build and install Mugen, run the following commands:
 
 ```sh
+cd src
 make
 sudo make install
 ```
@@ -27,7 +28,7 @@ When more than 8 control signals have been defined (and therefore more than a si
 
 ## Specification File Format
 
-A Mugen specification file (.mu) consists of the following sections: signals, opcodes, microcode, address and rom.
+A Mugen specification file (.mu) consists of the following sections: signals, opcodes, microcode, address and rom. Anything outside these sections will be ignored and can therefor be used as comments. Comments inside sections are currently not supported.
 
 ### Signals
 Defines all control signals used in the microcode.
