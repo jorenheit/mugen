@@ -24,12 +24,14 @@ namespace Mugen {
         
         size_t flag_bits = 0;
         size_t flag_bits_start = 0;
+
+	size_t total_bits = 0;
     };
 
     struct RomSpecs {
         int word_count;
         int bits_per_word;
-        int address_bits;
+        size_t address_bits;
     };
 
     int lineNr = 0;
@@ -135,7 +137,8 @@ namespace Mugen {
 	    }
 	    ++lineNr;
         }
-        
+
+	result.total_bits = count;
         return result;
     }
 
@@ -438,11 +441,16 @@ namespace Mugen {
         error_if(!opcodesDefined, "missing section: opcodes.");
         error_if(!addressMappingDefined, "missing section: address.");
         error_if(!microcodeDefined, "missing section: microcode.");
-        
+
         RomSpecs rom = parseRomSpecs(sections["rom"]);
+        AddressMapping addressMapping = parseAddressMapping(sections["address"]);
+
+	error_if(addressMapping.total_bits > rom.address_bits,
+		 "Total number of bits used in address specification (", addressMapping.total_bits ,") exceeds number of address lines of the ROM (", rom.address_bits,").");
+	
         std::vector<std::string> signals = parseSignals(sections["signals"]);
         std::vector<Opcode> opcodes = parseOpcodes(sections["opcodes"]);
-        AddressMapping addressMapping = parseAddressMapping(sections["address"]);
+	
         return parseMicrocode(sections["microcode"], rom, signals, opcodes, addressMapping);
     }
 
