@@ -77,7 +77,7 @@ Specifies how the microcode is addressed. The values specify the number of bits 
 }
 ```
 
-The order in which these are declared determines the position in the address. For example, the declaration below leads to the following configuration:
+The order in which these are declared determines their position in the address. For example, the declaration above leads to the following configuration (for a 8192 byte ROM):
 
 ``` 
 Address Bit: 13 12 11 10 09 08 07 06 05 04 03 02 01 00 
