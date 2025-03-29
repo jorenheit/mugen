@@ -8,6 +8,7 @@ Mugen is a microcode generator that converts a structured specification file int
 To build and install Mugen, run the following commands:
 
 ```sh
+cd src
 make
 sudo make install
 ```
