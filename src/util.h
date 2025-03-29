@@ -6,7 +6,7 @@
 #include <bitset>
 
 namespace Mugen {
-extern int lineNr;
+    extern int lineNr;
 }
 
 void trim(std::string &str);
@@ -15,10 +15,10 @@ std::string toBinaryString(size_t num, size_t minBits);
 
 template <typename ... Args>
 void error_if(bool condition, Args ... args) {
-	if (!condition) return;
-	
-	(std::cerr << "ERROR:" << Mugen::lineNr << ": " <<  ... << args) << '\n';
-	std::exit(1);
+    if (!condition) return;
+        
+    (std::cerr << "ERROR:" << Mugen::lineNr << ": " <<  ... << args) << '\n';
+    std::exit(1);
 }
 
 #endif

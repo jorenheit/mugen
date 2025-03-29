@@ -3,8 +3,8 @@
 
 #include <vector>
 
-namespace Mugen {																											 
-	std::vector<std::vector<unsigned char>> parse(std::string const &filename);
+namespace Mugen {                                                                                                                                                                                                                        
+    std::vector<std::vector<unsigned char>> parse(std::string const &filename);
 }
 
 #endif
