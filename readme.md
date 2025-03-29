@@ -44,10 +44,10 @@ Defines all control signals used in the microcode.
     ...
 }
 ```
-The first signal will appear as the least significant bit in the resulting control signal configurations.
+Each signal has to appear on a new line; the first signal will appear as the least significant bit in the resulting control signal configurations.
 
 ### Opcodes
-Defines the available opcodes and assigns their numerical values (in hex).
+Defines the available opcodes and assigns their numerical values (in hex). Each opcode must be defined on its own line.
 
 ```
 [opcodes] {
