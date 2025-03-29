@@ -47,7 +47,7 @@ Defines all control signals used in the microcode.
 The first signal will appear as the least significant bit in the resulting control signal configurations.
 
 ### Opcodes
-Assigns numerical values to each instruction.
+Defines the available opcodes and assigns their numerical values (in hex).
 
 ```
 [opcodes] {
