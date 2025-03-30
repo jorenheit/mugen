@@ -1,5 +1,5 @@
 CXX      := g++
-CXXFLAGS := -Wall --std=c++23
+CXXFLAGS := -Wall --std=c++20
 TARGET   := mugen
 SRC      := main.cc util.cc mugen.cc
 OBJ      := $(SRC:.cc=.o)
