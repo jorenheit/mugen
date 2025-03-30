@@ -49,17 +49,17 @@ namespace Mugen {
     std::vector<std::string> parseSignals(Body const &body) {
         std::istringstream iss(body.str);
         std::vector<std::string> result;
-        std::string line;
+        std::string ident;
         lineNr = body.lineNr;
-        while (std::getline(iss, line)) {
-	    trim(line);
-	    if (line.empty()) {
+        while (std::getline(iss, ident)) {
+	    trim(ident);
+	    if (ident.empty()) {
 		++lineNr;
 		continue;
 	    }
 
-	    validateIdentifier(line);
-	    result.push_back(line);
+	    validateIdentifier(ident);
+	    result.push_back(ident);
 	    ++lineNr;
         }
         
@@ -67,6 +67,7 @@ namespace Mugen {
     }
 
     std::vector<Opcode> parseOpcodes(Body const &body) {
+
 	auto constructOpcode = [](std::string const &lhs, std::string const &rhs) -> Opcode {
 	    validateIdentifier(lhs);
 	    int value;
@@ -80,7 +81,8 @@ namespace Mugen {
         std::vector<Opcode> result;
         std::string line;
         lineNr = body.lineNr;
-        while (std::getline(iss, line)) {
+
+	while (std::getline(iss, line)) {
 	    trim(line);
 	    if (line.empty()) {
 		++lineNr;
@@ -96,7 +98,8 @@ namespace Mugen {
 	    result.push_back(oc);
 	    ++lineNr;
         }
-        return result;
+
+	return result;
     }
 
 
@@ -200,7 +203,8 @@ namespace Mugen {
     }
 
     std::map<std::string, Body> parseSections(std::istream &file) {
-        enum State {
+
+	enum State {
 	    PARSING_TOP_LEVEL,
 	    PARSING_SECTION_HEADER,
 	    LOOKING_FOR_OPENING_BRACE,
@@ -278,6 +282,7 @@ namespace Mugen {
     }
 
     void findMatches(std::string &bits, std::vector<size_t> &matches, size_t idx = 0) {
+
         if (idx == bits.length()) {
 	    matches.push_back(std::stoi(bits, nullptr, 2));
 	    return;
@@ -327,8 +332,8 @@ namespace Mugen {
 		continue;
 	    }
 	    
-	    std::vector<std::string> operands = split(line, '>');
-	    if (operands.size() == 1) operands.push_back("");
+	    std::vector<std::string> operands = split(line, '>', true);
+	    //	    if (operands.size() == 1) operands.push_back("");
 	    
 	    std::vector<std::string> lhs = operands.size() ? split(operands[0], ':') : std::vector<std::string>{};
 	    error_if(operands.size() != 2 || lhs.size() != 3, 
@@ -407,7 +412,7 @@ namespace Mugen {
 		error_if(!match,
 			 "signal ", signal, " not declared in signal section.");
 	    }
-                        
+
 	    // Assign bitvector to all matching indices
 	    std::vector<size_t> matchedIndices;
 	    findMatches(addressString, matchedIndices);
@@ -428,7 +433,8 @@ namespace Mugen {
     }
 
     std::vector<std::vector<unsigned char>> parse(std::string const &filename) {
-        std::ifstream file(filename);
+
+	std::ifstream file(filename);
         error_if(!file, "could not open file ", filename, ".");
         
         bool romSpecsDefined = false;

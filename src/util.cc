@@ -16,7 +16,7 @@ void trim(std::string &str) {
     str = str.substr(start, stop - start + 1);
 }
 
-std::vector<std::string> split(std::string const &str, char const c) {
+std::vector<std::string> split(std::string const &str, char const c, bool allowEmpty) {
     std::vector<std::string> result;
     std::string component;
     for (size_t idx = 0; idx != str.length(); ++idx) {
@@ -30,7 +30,7 @@ std::vector<std::string> split(std::string const &str, char const c) {
 	}
     }
     trim(component);
-    if (!component.empty()) result.push_back(component);
+    if (allowEmpty || !component.empty()) result.push_back(component);
     return result;
 }
 
