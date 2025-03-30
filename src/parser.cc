@@ -1,5 +1,5 @@
 #include <fstream>
-#include <map>
+#include <unordered_map>
 #include <sstream>
 #include "util.h"
 
@@ -24,8 +24,6 @@ namespace Mugen {
         
         size_t flag_bits = 0;
         size_t flag_bits_start = 0;
-
-	size_t total_bits = 0;
     };
 
     struct RomSpecs {
@@ -34,8 +32,9 @@ namespace Mugen {
         size_t address_bits;
     };
 
-    int lineNr = 0;
-
+    int _lineNr = 0;
+    std::string _file;
+    
     void validateIdentifier(std::string const &ident) {
 	for (char c : ident) {
 	    error_if(std::isspace(c),
@@ -50,29 +49,29 @@ namespace Mugen {
         std::istringstream iss(body.str);
         std::vector<std::string> result;
         std::string ident;
-        lineNr = body.lineNr;
+        _lineNr = body.lineNr;
         while (std::getline(iss, ident)) {
 	    trim(ident);
 	    if (ident.empty()) {
-		++lineNr;
+		++_lineNr;
 		continue;
 	    }
 
 	    validateIdentifier(ident);
 	    result.push_back(ident);
-	    ++lineNr;
+	    ++_lineNr;
         }
         
         return result;
     }
 
-    std::vector<Opcode> parseOpcodes(Body const &body) {
+    std::vector<Opcode> parseOpcodes(Body const &body, int maxOpcodeBits) {
 
 	auto constructOpcode = [](std::string const &lhs, std::string const &rhs) -> Opcode {
 	    validateIdentifier(lhs);
 	    int value;
 	    error_if(!stringToInt(rhs, value, 16),
-		     "value assigned to opcode ", rhs, " is not a valid hexadecimal number.");
+		     "value assigned to opcode \"", rhs, "\" is not a valid hexadecimal number.");
 	    return {lhs, static_cast<size_t>(value)};
 	};
 
@@ -80,77 +79,93 @@ namespace Mugen {
         std::istringstream iss(body.str);
         std::vector<Opcode> result;
         std::string line;
-        lineNr = body.lineNr;
+        _lineNr = body.lineNr;
 
 	while (std::getline(iss, line)) {
 	    trim(line);
 	    if (line.empty()) {
-		++lineNr;
+		++_lineNr;
 		continue;
 	    }
 
 
 	    std::vector<std::string> operands = split(line, '=');
-	    error_if (operands.size() != 2,
-		      "incorrect opcode format, should be of the form [OPCODE] = [HEX VALUE].");
+	    error_if(operands.size() != 2,
+		     "incorrect opcode format, should be of the form [OPCODE] = [HEX VALUE].");
 
 	    Opcode oc = constructOpcode(operands[0], operands[1]);
-	    result.push_back(oc);
-	    ++lineNr;
-        }
+	    error_if(oc.value >= (1U << maxOpcodeBits),
+		     "value assigned to opcode \"", oc.ident, "\" (", oc.value, ") does not fit inside ", maxOpcodeBits, " bits.");
 
+	    result.push_back(oc);
+	    ++_lineNr;
+        }
+	
 	return result;
     }
 
 
 
-    AddressMapping parseAddressMapping(Body const &body) {
+    AddressMapping parseAddressMapping(Body const &body, int maxAddressBits) {
 	
         std::istringstream iss(body.str);
         AddressMapping result;
-        lineNr = body.lineNr;   
+        _lineNr = body.lineNr;   
         std::string line;
         int count = 0;
 
 	while (std::getline(iss, line)) {
 	    trim(line);
 	    if (line.empty()) {
-		++lineNr;
+		++_lineNr;
 		continue;
 	    }
 
 	    std::vector<std::string> operands = split(line, ':');
-	    error_if(operands.size() != 2, "invalid format for address specifier, should be [IDENTIFIER]: [NUMBER OF BITS].");
+	    error_if(operands.size() != 2,
+		     "invalid format for address specifier, should be [IDENTIFIER]: [NUMBER OF BITS].");
 
 	    std::string rhs = operands[1];
 	    int bits;
 	    error_if(!stringToInt(rhs, bits),
 		     "specified number of bits (", rhs, ") is not a valid decimal number.");
-	    error_if(bits <= 0, "number of bits must be a positive integer.");
-                        
+	    error_if(bits <= 0,
+		     "number of bits must be a positive integer.");
+
+	    
 	    std::string const &ident = operands[0];
 	    if (ident == "cycle") {
-		error_if(result.cycle_bits > 0, "multiple definitions of cycle bits.");
+		error_if(result.cycle_bits > 0,
+			 "multiple definitions of cycle bits.");
+		
 		result.cycle_bits = bits;
 		result.cycle_bits_start = count;
 	    }
 	    else if (ident == "opcode") {
-		error_if(result.opcode_bits > 0, "multiple definitions of opcode bits.");
+		error_if(result.opcode_bits > 0,
+			 "multiple definitions of opcode bits.");
+		
 		result.opcode_bits = bits;
 		result.opcode_bits_start = count;
 	    }
 	    else if (ident == "flags") {
-		error_if(result.flag_bits > 0, "multiple definitions of flag bits.");
+		error_if(result.flag_bits > 0,
+			 "multiple definitions of flag bits.");
+		
 		result.flag_bits = bits;
 		result.flag_bits_start = count;
 	    }
 	    else error("unknown identifier ", ident, ".");
                         
 	    count += bits;
-	    ++lineNr;
+	    ++_lineNr;
         }
 
-	result.total_bits = count;
+
+	error_if(count > maxAddressBits,
+		 "Total number of bits used in address specification (", count ,") "
+		 "exceeds number of address lines of the ROM (", maxAddressBits,").");
+
         return result;
     }
 
@@ -158,7 +173,7 @@ namespace Mugen {
     RomSpecs parseRomSpecs(Body const &body) {
 
         std::istringstream iss(body.str);
-        lineNr = body.lineNr;
+        _lineNr = body.lineNr;
         RomSpecs result;
         bool done = false;
         std::string line;
@@ -166,29 +181,33 @@ namespace Mugen {
 	while (std::getline(iss, line)) {
 	    trim(line);
 	    if (line.empty()) {
-		++lineNr;
+		++_lineNr;
 		continue;
 	    }
-	    error_if(done, "rom specification can only contain at most 1 non-empty line.");
+	    error_if(done,
+		     "rom specification can only contain at most 1 non-empty line.");
                         
 	    std::vector<std::string> values = split(line, 'x');
-	    error_if(values.size() != 2, "invalid format for rom specification, should be [NUMBER OF WORDS]x[BITS_PER_WORD].");
+	    error_if(values.size() != 2,
+		     "invalid format for rom specification, should be [NUMBER OF WORDS]x[BITS_PER_WORD].");
 
 	    // Get number of words
 	    {
 		error_if(!stringToInt(values[0], result.word_count),
 			 "specified number of words (", values[0], ") is not a valid decimal number.");
-		error_if(result.word_count <= 0, "specified number of words (", result.word_count, ") must be a positive integer.");
+		error_if(result.word_count <= 0,
+			 "specified number of words (", result.word_count, ") must be a positive integer.");
 	    }
 	    // Get bits per word
 	    {
 		error_if(!stringToInt(values[1], result.bits_per_word),
 			 "specified number of bits per word (", values[1], ") is not a valid decimal number.");
-		error_if(result.bits_per_word != 8, "only 8 bit words are currently supported.");
+		error_if(result.bits_per_word != 8,
+			 "only 8 bit words are currently supported.");
 	    }
 	    
 	    done = true;
-	    ++lineNr;
+	    ++_lineNr;
         }
         
         int n = result.word_count;
@@ -202,7 +221,7 @@ namespace Mugen {
         return result;
     }
 
-    std::map<std::string, Body> parseSections(std::istream &file) {
+    std::unordered_map<std::string, Body> parseTopLevel(std::istream &file) {
 
 	enum State {
 	    PARSING_TOP_LEVEL,
@@ -212,8 +231,8 @@ namespace Mugen {
         };
         
         State state = PARSING_TOP_LEVEL;
-        lineNr = 1;
-        std::map<std::string, Body> result;
+        _lineNr = 1;
+        std::unordered_map<std::string, Body> result;
         std::string currentSection;
         std::string currentBody;
         int bodyLineNr;
@@ -221,7 +240,7 @@ namespace Mugen {
         char ch;
 	
         while (file.get(ch)) {
-	    if (ch == '\n') ++lineNr;
+	    if (ch == '\n') ++_lineNr;
 
 	    switch (state) {
 	    case PARSING_TOP_LEVEL: {
@@ -230,7 +249,7 @@ namespace Mugen {
 	    }
 	    case PARSING_SECTION_HEADER: {
 		error_if(ch == '{' || ch == '}',
-			 "expected closing bracket ']' before '", ch, "' in section header.");
+			 "expected ']' before '", ch, "' in section header.");
 
 		if (ch == ']') state = LOOKING_FOR_OPENING_BRACE;
 		else currentSection += ch;
@@ -239,7 +258,7 @@ namespace Mugen {
 	    case LOOKING_FOR_OPENING_BRACE: {
 		if (std::isspace(ch)) break;
 		error_if(ch != '{',
-			 "expected opening brace '{' before '", ch, "' in section definition.");
+			 "expected '{' before '", ch, "' in section definition.");
 		
 		state = PARSING_SECTION_BODY;
 		isFirstCharacterOfBody = true;
@@ -247,11 +266,11 @@ namespace Mugen {
 	    }
 	    case PARSING_SECTION_BODY: {
 		error_if(ch == '[',
-			 "expected closing brace '}' before '", ch, "' in section definition.");
+			 "expected '}' before '", ch, "' in section definition.");
                         
 		if (ch != '}') {
 		    if (!std::isspace(ch) && isFirstCharacterOfBody) {
-			bodyLineNr = lineNr;
+			bodyLineNr = _lineNr;
 			isFirstCharacterOfBody = false;
 		    }
 		    currentBody += ch;
@@ -322,13 +341,13 @@ namespace Mugen {
         std::vector<bool> visited(rom.word_count);
         
         std::istringstream iss(body.str);
-        lineNr = body.lineNr;
+        _lineNr = body.lineNr;
         std::string line;
         
         while (std::getline(iss, line)) {
 	    trim(line);
 	    if (line.empty()) {
-		++lineNr;
+		++_lineNr;
 		continue;
 	    }
 	    
@@ -343,7 +362,7 @@ namespace Mugen {
 	    std::string addressString(rom.address_bits, 'x');
 
 	    // Lambda for inserting bits into the address-string
-	    auto insertIntoAddressString = [&](std::string const &bitString, int bits_start, int n_bits) {
+	    auto insertIntoAddressString = [&addressString, &rom](std::string const &bitString, int bits_start, int n_bits) {
 		addressString.replace(rom.address_bits - bits_start - n_bits, n_bits, bitString);
 	    };
 	    
@@ -355,12 +374,11 @@ namespace Mugen {
 		    for (Opcode const &oc: opcodes) {
 			if (userStr == oc.ident) {
 			    opcodeStr = toBinaryString(oc.value, mapping.opcode_bits);
-			    error_if(opcodeStr.length() > mapping.opcode_bits,
-				     "value assigned to opcode ", userStr, " (", oc.value, ") does not fit inside ", mapping.opcode_bits, " bits.");
 			    break;
 			}
 		    }
-		    error_if(opcodeStr.empty(), "opcode ", userStr, " not declared in opcode section.");
+		    error_if(opcodeStr.empty(),
+			     "opcode ", userStr, " not declared in opcode section.");
 		    insertIntoAddressString(opcodeStr, mapping.opcode_bits_start, mapping.opcode_bits);
 		}
 	    }
@@ -387,7 +405,8 @@ namespace Mugen {
 	    {
 		std::string flagStr = lhs[2];
 		error_if(flagStr.length() != mapping.flag_bits, 
-			 "number of flag bits (", flagStr.length(), ") does not match number of flag bits defined in the address section (", mapping.flag_bits, ")");
+			 "number of flag bits (", flagStr.length(), ") does not match number of flag bits "
+			 "defined in the address section (", mapping.flag_bits, ")");
                                 
 		for (char c: flagStr) { 
 		    error_if(c != '0' && c != '1' && c != 'x',
@@ -410,7 +429,7 @@ namespace Mugen {
 		    }
 		}
 		error_if(!match,
-			 "signal ", signal, " not declared in signal section.");
+			 "signal \"", signal, "\" not declared in signal section.");
 	    }
 
 	    // Assign bitvector to all matching indices
@@ -426,7 +445,7 @@ namespace Mugen {
 		}
 	    }
                 
-	    ++lineNr;
+	    ++_lineNr;
         }
         
         return images;                                                                                                                                  
@@ -435,42 +454,39 @@ namespace Mugen {
     std::vector<std::vector<unsigned char>> parse(std::string const &filename) {
 
 	std::ifstream file(filename);
-        error_if(!file, "could not open file ", filename, ".");
-        
-        bool romSpecsDefined = false;
-        bool signalsDefined = false;
-        bool opcodesDefined = false;
-        bool addressMappingDefined = false;
-        bool microcodeDefined = false;
+        error_if(!file,
+		 "could not open file \"", filename, "\".");
 
-        auto sections = parseSections(file);
-        for (auto const &pr: sections) {
-	    if (pr.first == "rom")            romSpecsDefined = true;
-	    else if (pr.first == "signals")   signalsDefined = true;
-	    else if (pr.first == "opcodes")   opcodesDefined = true;
-	    else if (pr.first == "address")   addressMappingDefined = true;
-	    else if (pr.first == "microcode") microcodeDefined = true;
-	    else {
-		lineNr = pr.second.lineNr;
-		error("invalid section \"", pr.first, "\".");
+	_file = filename;
+	std::unordered_map<std::string, bool> requiredSections{
+	    {"rom", false},
+	    {"signals", false},
+	    {"opcodes", false},
+	    {"address", false},
+	    {"microcode", false}
+	};
+
+	auto sections = parseTopLevel(file);
+	for (auto const &[name, body]: sections) {
+	    if (requiredSections.contains(name)) {
+		requiredSections[name] = true;
 	    }
-        }
+	    else {
+		_lineNr = body.lineNr;
+		error("invalid section \"", name, "\".");
+	    }
+	}
 
-        lineNr = 0;
-        error_if(!romSpecsDefined, "missing section: rom.");
-        error_if(!signalsDefined, "missing section: signals.");
-        error_if(!opcodesDefined, "missing section: opcodes.");
-        error_if(!addressMappingDefined, "missing section: address.");
-        error_if(!microcodeDefined, "missing section: microcode.");
+	_lineNr = 0;
+	for (auto const &[name, defined]: requiredSections) {
+	    error_if(!defined,
+		     "missing section: \"", name, "\".");
+	}
 
         RomSpecs rom = parseRomSpecs(sections["rom"]);
-        AddressMapping addressMapping = parseAddressMapping(sections["address"]);
-
-	error_if(addressMapping.total_bits > rom.address_bits,
-		 "Total number of bits used in address specification (", addressMapping.total_bits ,") exceeds number of address lines of the ROM (", rom.address_bits,").");
-	
+        AddressMapping addressMapping = parseAddressMapping(sections["address"], rom.address_bits);
         std::vector<std::string> signals = parseSignals(sections["signals"]);
-        std::vector<Opcode> opcodes = parseOpcodes(sections["opcodes"]);
+        std::vector<Opcode> opcodes = parseOpcodes(sections["opcodes"], addressMapping.opcode_bits);
 	
         return parseMicrocode(sections["microcode"], rom, signals, opcodes, addressMapping);
     }

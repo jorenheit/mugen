@@ -6,7 +6,8 @@
 #include <bitset>
 
 namespace Mugen {
-    extern int lineNr;
+    extern int _lineNr;
+    extern std::string _file;
 }
 
 void trim(std::string &str);
@@ -16,7 +17,7 @@ bool stringToInt(std::string const &str, int &result, int base = 10);
 
 template <typename ... Args>
 void error(Args ... args) {
-    (std::cerr << "ERROR:" << Mugen::lineNr << ": " <<  ... << args) << '\n';
+    (std::cerr << "ERROR:" << Mugen::_file << ":" << Mugen::_lineNr << ": " <<  ... << args) << '\n';
     std::exit(1);
 }
 
