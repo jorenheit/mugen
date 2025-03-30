@@ -1,7 +1,7 @@
 CXX      := g++
-CXXFLAGS := -Wall --std=c++20
+CXXFLAGS := -Wall --std=c++23
 TARGET   := mugen
-SRC      := main.cc util.cc parser.cc
+SRC      := main.cc util.cc mugen.cc
 OBJ      := $(SRC:.cc=.o)
 PREFIX   := /usr/local
 BINDIR   := $(PREFIX)/bin

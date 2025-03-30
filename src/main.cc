@@ -1,13 +1,12 @@
 #include <iostream>
 #include <fstream>
-#include "util.h"
-#include "parser.h"
+#include "mugen.h"
 
 void printHelp(std::string const &progName) {
-    std::cout << "Usage: " << progName << " <specification-file (.mu)> <output-file>\n\n";
-    std::cout << "Mugen is a microcode generator that converts a specification file\n"
+    std::cout << "Usage: " << progName << " <specification-file (.mu)> <output-file>\n\n"
+	      << "Mugen is a microcode generator that converts a specification file\n"
               << "into microcode images suitable for flashing onto ROM chips.\n"
-	      << "See https://github.com/jorenheit/mugen/tree/main for more help.\n\n"
+	      << "See https://github.com/jorenheit/mugen for more help.\n\n"
               << "Options:\n"
               << "  -h, --help    Display this help message and exit\n\n"
               << "Example:\n"
@@ -22,7 +21,7 @@ int main(int argc, char **argv) {
     }
 
     if (argc != 3) {
-        std::cerr << "Error: Invalid number of arguments.\n\n";
+        std::cerr << "ERROR: Invalid number of arguments.\n\n";
         printHelp(argv[0]);
         return 1;
     }
@@ -35,7 +34,10 @@ int main(int argc, char **argv) {
     for (size_t part = 0; part != images.size(); ++part) {
 	std::string filename = outFilename + ((images.size() > 0) ? ("." + std::to_string(part)) : "");
 	std::ofstream out(filename, std::ios::binary);
-	error_if(!out, "could not open output file '", filename, "'.");
+	if (!out) {
+	    std::cerr << "ERROR: Could not open output file \"" << filename << "\".";
+	    return 1;
+	}
 	out.write(reinterpret_cast<char const *>(images[part].data()), images[part].size());
 	out.close();
     }

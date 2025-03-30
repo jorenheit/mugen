@@ -34,6 +34,18 @@ namespace Mugen {
 
     int _lineNr = 0;
     std::string _file;
+
+    template <typename ... Args>
+    void error(Args ... args) {
+	(std::cerr << Mugen::_file << ":" << Mugen::_lineNr << ": ERROR: " <<  ... << args) << '\n';
+	std::exit(1);
+    }
+
+    template <typename ... Args>
+    void error_if(bool condition, Args ... args) {
+	if (condition) error(args...);
+    }
+
     
     void validateIdentifier(std::string const &ident) {
 	for (char c : ident) {
