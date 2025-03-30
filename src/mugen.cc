@@ -55,7 +55,7 @@ namespace Mugen {
 	    error_if(!std::isalnum(c) && c != '_',
 		     "Identifier \"", ident, "\" contains invalid character: '", c, "'.");
 	}
-	error_if(ident == "x", "\"x\" may not be used as an identifier.");
+	error_if(ident == "x" || ident == "X", "\"x\" and \"X\" may not be used as identifiers.");
     }
     
     std::vector<std::string> parseSignals(Body const &body) {
@@ -240,10 +240,13 @@ namespace Mugen {
 	    PARSING_TOP_LEVEL,
 	    PARSING_SECTION_HEADER,
 	    LOOKING_FOR_OPENING_BRACE,
-	    PARSING_SECTION_BODY
+	    PARSING_SECTION_BODY,
+	    PARSING_COMMENT
         };
         
         State state = PARSING_TOP_LEVEL;
+	State stateBeforeComment = state;
+	
         _lineNr = 1;
         std::unordered_map<std::string, Body> result;
         std::string currentSection;
@@ -258,11 +261,20 @@ namespace Mugen {
 	    switch (state) {
 	    case PARSING_TOP_LEVEL: {
 		if (ch == '[') state = PARSING_SECTION_HEADER;
+		else if (ch == '#') {
+		    stateBeforeComment = state;
+		    state = PARSING_COMMENT;
+		}
+		else if (!std::isspace(ch)){
+		    error("only comments (use #) may appear outside sections.");
+		}
 		break; // ignore all other characters at top level
 	    }
 	    case PARSING_SECTION_HEADER: {
 		error_if(ch == '{' || ch == '}',
 			 "expected ']' before '", ch, "' in section header.");
+		error_if(ch == '#',
+			 "cannot place comments inside a section header.");
 
 		if (ch == ']') state = LOOKING_FOR_OPENING_BRACE;
 		else currentSection += ch;
@@ -270,11 +282,16 @@ namespace Mugen {
 	    }
 	    case LOOKING_FOR_OPENING_BRACE: {
 		if (std::isspace(ch)) break;
-		error_if(ch != '{',
-			 "expected '{' before '", ch, "' in section definition.");
-		
-		state = PARSING_SECTION_BODY;
-		isFirstCharacterOfBody = true;
+		if (ch == '#') {
+		    stateBeforeComment = state;
+		    state = PARSING_COMMENT;
+		}
+		else {
+		    error_if(ch != '{',
+			     "expected '{' before '", ch, "' in section definition.");
+		    state = PARSING_SECTION_BODY;
+		    isFirstCharacterOfBody = true;
+		}
 		break;
 	    }
 	    case PARSING_SECTION_BODY: {
@@ -282,7 +299,12 @@ namespace Mugen {
 			 "expected '}' before '", ch, "' in section definition.");
                         
 		if (ch != '}') {
-		    if (!std::isspace(ch) && isFirstCharacterOfBody) {
+		    if (ch == '#') {
+			stateBeforeComment = state;
+			state = PARSING_COMMENT;
+			break;
+		    }
+		    else if (!std::isspace(ch) && isFirstCharacterOfBody) {
 			bodyLineNr = _lineNr;
 			isFirstCharacterOfBody = false;
 		    }
@@ -296,6 +318,16 @@ namespace Mugen {
 		    currentBody.clear();
 		    state = PARSING_TOP_LEVEL;
 		}
+		break;
+	    }
+	    case PARSING_COMMENT: {
+		if (ch == '\n') {
+		    state = stateBeforeComment;
+		    if (state == PARSING_SECTION_BODY) { 
+			currentBody += '\n';
+		    }
+		}
+		break;
 	    }}
         }
 
@@ -354,7 +386,7 @@ namespace Mugen {
 	    // Insert opcode into address string
 	    {
 		std::string userStr = lhs[0];
-		if (userStr != "x") {
+		if (userStr != "x" && userStr != "X") {
 		    std::string opcodeStr;
 		    for (Opcode const &oc: opcodes) {
 			if (userStr == oc.ident) {
@@ -371,7 +403,7 @@ namespace Mugen {
 	    // Insert cycle into address string
 	    {
 		std::string userStr = lhs[1];
-		if (userStr != "x") {
+		if (userStr != "x" && userStr != "X") {
 		    std::string cycleStr;
 		    int value;
 		    error_if(!stringToInt(userStr, value),
@@ -383,7 +415,6 @@ namespace Mugen {
 		    
 		    insertIntoAddressString(cycleStr, mapping.cycle_bits_start, mapping.cycle_bits);
 		}
-
 	    }
                         
 	    // Insert flag bits into address string
@@ -394,7 +425,7 @@ namespace Mugen {
 			 "defined in the address section (", mapping.flag_bits, ")");
                                 
 		for (char c: flagStr) { 
-		    error_if(c != '0' && c != '1' && c != 'x',
+		    error_if(c != '0' && c != '1' && c != 'x' && c != 'X',
 			     "invalid flag bit '", c,"'; can only be 0, 1 or x (wildcard).");
 		}
 
@@ -427,7 +458,7 @@ namespace Mugen {
 		    if (c == '0' || c == '1') {
 			self(self, idx + 1);
 		    }
-		    else if (c == 'x') {
+		    else if (c == 'x' || c == 'X') {
 			c = '0'; self(self, idx + 1);
 			c = '1'; self(self, idx + 1);
 			c = 'x';

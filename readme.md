@@ -28,7 +28,7 @@ When more than 8 control signals have been defined (and therefore more than a si
 
 ## Specification File Format
 
-A Mugen specification file (.mu) consists of the following sections: signals, opcodes, microcode, address and rom. Anything outside these sections will be ignored and can therefor be used as comments. Comments inside sections are currently not supported.
+A Mugen specification file (.mu) consists of the following sections: signals, opcodes, microcode, address and rom. Outside sections, only comments are permitted. Comments start with a `#` and end at the end of the line.
 
 ### Signals
 Defines all control signals used in the microcode.
@@ -102,12 +102,3 @@ Describes the control signals for each instruction cycle. Each line specificies 
     LDA:4:xx > 
 }
 ```
-
-## Contributing
-
-Contributions and improvements are welcome! Feel free to submit issues and pull requests on GitHub.
-
-## License
-
-Mugen is released under the MIT License.
-
