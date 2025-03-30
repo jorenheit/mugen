@@ -1,4 +1,5 @@
-Microcode specification for the Brainf*ck CPU. See https://github.com/jorenheit/bfcpu.
+Example: Microcode specification for the Brainf*ck CPU.
+See https://github.com/jorenheit/bfcpu.
 
 [signals] {
         HLT

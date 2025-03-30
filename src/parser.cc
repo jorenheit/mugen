@@ -43,6 +43,7 @@ namespace Mugen {
 	    error_if(!std::isalnum(c) && c != '_',
 		     "Identifier \"", ident, "\" contains invalid character: '", c, "'.");
 	}
+	error_if(ident == "x", "\"x\" may not be used as an identifier.");
     }
     
     std::vector<std::string> parseSignals(Body const &body) {
