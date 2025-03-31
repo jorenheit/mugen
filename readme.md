@@ -101,7 +101,7 @@ Describes the control signals for each instruction cycle. Each line specificies 
     LDA:3:xx -> RO, AI
     LDA:4:xx ->
 
-    #...
+    # ...
 }
 ```
 
@@ -121,8 +121,10 @@ Only the catch rule is allowed to overlap with preceding rules. On every other r
 
 ```
 [microcode] {
+    # ...
     LDA:2:0x -> MI, IO
     LDA:2:01 -> R0, AI   # will collide with the rule above
+    # ...
 }
 ```
 
