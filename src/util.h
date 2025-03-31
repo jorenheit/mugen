@@ -7,6 +7,7 @@
 
 void trim(std::string &str);
 std::vector<std::string> split(std::string const &str, char const c, bool allowEmpty = false);
+std::vector<std::string> split(std::string const &str, std::string const &token, bool allowEmpty = false);
 std::string toBinaryString(size_t num, size_t minBits);
 bool stringToInt(std::string const &str, int &result, int base = 10);
 

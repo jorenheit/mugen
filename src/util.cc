@@ -17,20 +17,24 @@ void trim(std::string &str) {
 }
 
 std::vector<std::string> split(std::string const &str, char const c, bool allowEmpty) {
+    return split(str, std::string{c}, allowEmpty);
+}
+
+std::vector<std::string> split(std::string const &str, std::string const &token, bool allowEmpty) {
     std::vector<std::string> result;
-    std::string component;
-    for (size_t idx = 0; idx != str.length(); ++idx) {
-	if (str[idx] != c) {
-	    component += str[idx];
-	}
-	else {
-	    trim(component);
-	    result.push_back(component);
-	    component.clear();
-	}
+
+    size_t prev = 0;
+    size_t current = 0;
+    while ((current = str.find(token, prev)) != std::string::npos) {
+	std::string part = str.substr(prev, current - prev);
+	trim(part);
+	result.push_back(part);
+	prev = current + token.length();
     }
-    trim(component);
-    if (allowEmpty || !component.empty()) result.push_back(component);
+    std::string last = str.substr(prev);
+    trim(last);
+    if (allowEmpty || !last.empty()) result.push_back(last);
+
     return result;
 }
 

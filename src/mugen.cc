@@ -1,6 +1,8 @@
 #include <cassert>
 #include <fstream>
 #include <unordered_map>
+#include <unordered_set>
+#include <algorithm>
 #include <sstream>
 #include "util.h"
 
@@ -58,10 +60,12 @@ namespace Mugen {
 	error_if(ident == "x" || ident == "X", "\"x\" and \"X\" may not be used as identifiers.");
     }
     
-    std::vector<std::string> parseSignals(Body const &body) {
+    std::unordered_map<std::string, size_t> parseSignals(Body const &body) {
+    
         std::istringstream iss(body.str);
-        std::vector<std::string> result;
+	std::unordered_map<std::string, size_t> result;
         std::string ident;
+	size_t idx = 0;
         _lineNr = body.lineNr;
         while (std::getline(iss, ident)) {
 	    trim(ident);
@@ -71,16 +75,18 @@ namespace Mugen {
 	    }
 
 	    validateIdentifier(ident);
-	    result.push_back(ident);
+	    bool success = result.insert({ident, idx++}).second;
+	    error_if(!success,
+		     "duplicate definition of signal \"", ident, "\".");
 	    ++_lineNr;
         }
         
         return result;
     }
 
-    std::vector<Opcode> parseOpcodes(Body const &body, int maxOpcodeBits) {
+    std::unordered_map<std::string, size_t> parseOpcodes(Body const &body, int maxOpcodeBits) {
 
-	auto constructOpcode = [](std::string const &lhs, std::string const &rhs) -> Opcode {
+	auto constructOpcode = [](std::string const &lhs, std::string const &rhs) -> std::pair<std::string, size_t> {
 	    validateIdentifier(lhs);
 	    int value;
 	    error_if(!stringToInt(rhs, value, 16),
@@ -90,7 +96,7 @@ namespace Mugen {
 
 	
         std::istringstream iss(body.str);
-        std::vector<Opcode> result;
+	std::unordered_map<std::string, size_t> result;
         std::string line;
         _lineNr = body.lineNr;
 
@@ -103,14 +109,20 @@ namespace Mugen {
 
 
 	    std::vector<std::string> operands = split(line, '=');
+	    error_if(operands.size() == 1,
+		     "expected \"=\" in opcode definition.");
+	    
 	    error_if(operands.size() != 2,
 		     "incorrect opcode format, should be of the form [OPCODE] = [HEX VALUE].");
 
-	    Opcode oc = constructOpcode(operands[0], operands[1]);
-	    error_if(oc.value >= (1U << maxOpcodeBits),
-		     "value assigned to opcode \"", oc.ident, "\" (", oc.value, ") does not fit inside ", maxOpcodeBits, " bits.");
+	    auto [ident, value] = constructOpcode(operands[0], operands[1]);
+	    error_if(value >= (1U << maxOpcodeBits),
+		     "value assigned to opcode \"", ident, "\" (", value, ") does not fit inside ", maxOpcodeBits, " bits.");
 
-	    result.push_back(oc);
+	    bool success = result.insert({ident, value}).second;
+	    error_if(!success,
+		     "duplicate definition of opcode \"", ident, "\".");
+		     
 	    ++_lineNr;
         }
 	
@@ -348,8 +360,8 @@ namespace Mugen {
 
     std::vector<std::vector<unsigned char>> parseMicrocode(Body const &body,        
 							   RomSpecs const &rom,
-							   std::vector<std::string> const &signals, 
-							   std::vector<Opcode> const &opcodes,
+							   std::unordered_map<std::string, size_t> const &signals,
+							   std::unordered_map<std::string, size_t> const &opcodes,
 							   AddressMapping const &mapping) {
         
         size_t nParts = (signals.size() + 7) / 8;
@@ -357,7 +369,7 @@ namespace Mugen {
         for (size_t part = 0; part != nParts; ++part) {
 	    result.emplace_back(rom.word_count);
         }
-        std::vector<bool> visited(rom.word_count);
+        std::vector<size_t> visited(rom.word_count);
         
         std::istringstream iss(body.str);
         _lineNr = body.lineNr;
@@ -370,27 +382,32 @@ namespace Mugen {
 		continue;
 	    }
 	    
-	    std::vector<std::string> operands = split(line, '>', true);
+	    std::vector<std::string> operands = split(line, "->", true);
+	    error_if(operands.size() == 1,
+		     "expected \"->\" in microcode rule.");
+	    
 	    std::vector<std::string> lhs = operands.size() ? split(operands[0], ':') : std::vector<std::string>{};
-	    error_if(operands.size() != 2 || lhs.size() != 3, 
-		     "invalid format in microcode definition, should be [OPCODE]:[CYCLE]:[FLAGS] > [SIG1], ...");
-                        
+
+	    error_if(operands.size() != 2 && lhs.size() != 3, 
+		     "invalid format in microcode definition, should be [OPCODE]:[CYCLE]:[FLAGS] | catch > [SIG1], ...");
+
 	    // Build address string
 	    std::string addressString(rom.address_bits, 'x');
-
+	    bool catchAll = (operands[0] == "catch");
+	    
 	    // Lambda for inserting bits into the address-string
 	    auto insertIntoAddressString = [&addressString, &rom](std::string const &bitString, int bits_start, int n_bits) {
 		addressString.replace(rom.address_bits - bits_start - n_bits, n_bits, bitString);
 	    };
 	    
-	    // Insert opcode into address string
+	    if (!catchAll) // Insert opcode into address string
 	    {
 		std::string userStr = lhs[0];
 		if (userStr != "x" && userStr != "X") {
 		    std::string opcodeStr;
-		    for (Opcode const &oc: opcodes) {
-			if (userStr == oc.ident) {
-			    opcodeStr = toBinaryString(oc.value, mapping.opcode_bits);
+		    for (auto const &[ident, value]: opcodes) {
+			if (userStr == ident) {
+			    opcodeStr = toBinaryString(value, mapping.opcode_bits);
 			    break;
 			}
 		    }
@@ -400,7 +417,7 @@ namespace Mugen {
 		}
 	    }
                         
-	    // Insert cycle into address string
+	    if (!catchAll) // Insert cycle into address string
 	    {
 		std::string userStr = lhs[1];
 		if (userStr != "x" && userStr != "X") {
@@ -417,12 +434,12 @@ namespace Mugen {
 		}
 	    }
                         
-	    // Insert flag bits into address string
+	    if (!catchAll) // Insert flag bits into address string
 	    {
 		std::string flagStr = lhs[2];
 		error_if(flagStr.length() != mapping.flag_bits, 
 			 "number of flag bits (", flagStr.length(), ") does not match number of flag bits "
-			 "defined in the address section (", mapping.flag_bits, ")");
+			 "defined in the address section (", mapping.flag_bits, ")", flagStr);
                                 
 		for (char c: flagStr) { 
 		    error_if(c != '0' && c != '1' && c != 'x' && c != 'X',
@@ -431,21 +448,20 @@ namespace Mugen {
 
 		insertIntoAddressString(flagStr, mapping.flag_bits_start, mapping.flag_bits);
 	    }
-                        
+
+	    for (char &c: addressString) {
+		if (c == 'X') c = 'x';
+	    }
+	    catchAll = (addressString == std::string(rom.address_bits, 'x'));
+	    
 	    // Construct control signal bitvector                   
 	    std::vector<std::string> rhs = split(operands[1], ',');
 	    size_t bitvector = 0;
 	    for (std::string const &signal: rhs) {
-		bool match = false;
-		for (size_t idx = 0; idx != signals.size(); ++idx) {
-		    if (signal == signals[idx]) {
-			bitvector |= (1 << idx);
-			match = true;
-			break;
-		    }
+		if (auto const it = signals.find(signal); it != signals.end()) {
+		    bitvector |= (1 << it->second);
 		}
-		error_if(!match,
-			 "signal \"", signal, "\" not declared in signal section.");
+		else error("signal \"", signal, "\" not declared in signal section.");
 	    }
 
 
@@ -475,8 +491,10 @@ namespace Mugen {
 		    for (size_t part = 0; part != nParts; ++part) {
 			result[part][idx] = (bitvector >> (8 * part)) & 0xff;
 		    }
-		    visited[idx] = true;
+		    visited[idx] = _lineNr;
 		}
+		else error_if(!catchAll,
+			      "rule overlaps with rule previously defined on line ", visited[idx], ".");
 	    });
 	    
 	    ++_lineNr;

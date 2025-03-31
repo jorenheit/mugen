@@ -41,7 +41,7 @@ Defines all control signals used in the microcode.
     RO
     IO
     II
-    ...
+    #...
 }
 ```
 Each signal has to appear on a new line; the first signal will appear as the least significant bit in the resulting control signal configurations.
@@ -51,10 +51,10 @@ Defines the available opcodes and assigns their numerical values (in hex). Each 
 
 ```
 [opcodes] {
-    LDA = 0x01
+    LDA = 0x01   # these must be hexadecimal values
     ADD = 0x02
     OUT = 0x0e
-    ...
+    #...
 }
 ```
 
@@ -86,19 +86,43 @@ Address Bit: 13 12 11 10 09 08 07 06 05 04 03 02 01 00
 ```
 
 ### Microcode Definitions
-Describes the control signals for each instruction cycle. Each line specificies the opcode, cycle and flag configuration followed by `>` and a list of control signals (which may be empty). Wildcards denoted `x` will be matched to any opcode, any cycle number within the specified range or either 0 or 1 in the case of the flags.
+Describes the control signals for each instruction cycle. Each line specificies the opcode, cycle and flag configuration followed by `->` and a list of control signals (which may be empty). Wildcards denoted `x` will be matched to any opcode, any cycle number within the specified range or either 0 or 1 in the case of the flags.
 
 ```
 [microcode] {
-    x:0:xx > MI, CO
-    x:1:xx > RO, II, CE
+    x:0:xx -> MI, CO
+    x:1:xx -> RO, II, CE
 		
-    NOP:2:xx >
-    NOP:3:xx >
-    NOP:4:xx >
+    NOP:2:xx ->
+    NOP:3:xx ->
+    NOP:4:xx ->
 		
-    LDA:2:xx > MI, IO
-    LDA:3:xx > RO, AI
-    LDA:4:xx > 
+    LDA:2:xx -> MI, IO
+    LDA:3:xx -> RO, AI
+    LDA:4:xx ->
+
+    #...
 }
 ```
+
+## catch
+It might be useful to fill all yet undefined addresses with some kind of error-signal to indicate that the computer ended up in some undefined state. This can be done using wildcards or the reserved `catch` keyword. In either case below, all remaining cells will be assigned the ERR and HLT signal.
+
+```
+[microcode] {
+    # all previous rules
+    
+    catch -> ERR, HLT
+    x:x:xxxx -> ERR, HLT   # this is equivalent
+}
+```
+
+Only the catch rule is allowed to overlap with preceding rules. On every other rule an error will be raised when it is found to overlap with previously defined rules. Any normal rule following a catch-rule will always collide with the catch itself. Therefore the catch-rule should always come at the end of the microcode section.
+
+```
+[microcode] {
+    LDA:2:0x -> MI, IO
+    LDA:2:01 -> R0, AI   # will collide with the rule above
+}
+```
+

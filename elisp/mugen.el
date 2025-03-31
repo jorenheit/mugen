@@ -11,7 +11,7 @@
   :group 'mugen)
 
 (defconst mugen-keywords
-  '("rom" "address" "signals" "opcodes" "microcode" "cycle" "opcode" "flags"))
+  '("rom" "address" "signals" "opcodes" "microcode" "cycle" "opcode" "flags" "catch"))
 
 (defconst mugen-keywords-regexp
   (concat "\\b" (regexp-opt mugen-keywords t) "\\b"))
