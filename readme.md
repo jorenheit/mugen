@@ -127,7 +127,7 @@ Describes the control signals for each instruction cycle. Each line specificies 
 }
 ```
 
-## catch
+#### catch
 It might be useful to fill all yet undefined addresses with some kind of error-signal to indicate that the computer ended up in some undefined state. This can be done using wildcards or the reserved `catch` keyword. In either case below, all remaining cells will be assigned the ERR and HLT signal.
 
 ```
