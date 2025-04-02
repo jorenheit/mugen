@@ -374,7 +374,9 @@ namespace Mugen {
 		else {
 		    trim(currentSection);
 		    trim(currentBody);
-		    result[currentSection] = {currentBody, bodyLineNr};
+		    error_if(!result.insert({currentSection, {currentBody, bodyLineNr}}).second,
+			     "multiple definitions of section \"", currentSection, "\".");
+		    
 		    currentSection.clear();
 		    currentBody.clear();
 		    state = PARSING_TOP_LEVEL;
@@ -625,7 +627,7 @@ namespace Mugen {
 	    }
 	    else {
 		_lineNr = body.lineNr;
-		error("invalid section \"", name, "\".");
+		warning("ignoring unknown section \"", name, "\".");
 	    }
 	}
 
