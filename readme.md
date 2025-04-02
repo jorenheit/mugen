@@ -157,7 +157,7 @@ Only the catch rule is allowed to overlap with preceding rules. On every other r
 ```
 
 ## Example
-When Mugen is run on the example specification in the examples-folder of this repository, the following output is generated:
+When Mugen is run on the unsegmented BFCPU specification in the examples-folder of this repository, the following output is generated:
 
 ```
 $ mugen bfcpu.mu bfcpu.bin --layout
