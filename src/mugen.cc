@@ -157,6 +157,12 @@ namespace Mugen {
 	    bool success = result.insert({ident, value}).second;
 	    error_if(!success,
 		     "duplicate definition of opcode \"", ident, "\".");
+
+	    for (auto const &[other, otherValue]: result) {
+		if (other == ident) continue;
+		warning_if(value == otherValue,
+			   "signals \"", ident, "\" and \"", other, "\" are defined with the same value (", value, ").");
+	    }
 		     
 	    ++_lineNr;
         }
