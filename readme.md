@@ -155,3 +155,63 @@ Only the catch rule is allowed to overlap with preceding rules. On every other r
     # ...
 }
 ```
+
+## Example
+When Mugen is run on the example specification in the examples-folder of this repository, the following output is generated:
+
+```
+$ mugen bfcpu.mu bfcpu.bin --layout
+Successfully generated 3 images from bfcpu.mu: 
+  ROM 0 : bfcpu.bin.0
+  ROM 1 : bfcpu.bin.1
+  ROM 2 : bfcpu.bin.2
+
+[ROM 0, Segment 0] {
+  0: HLT
+  1: RS0
+  2: RS1
+  3: RS2
+  4: INC
+  5: DEC
+  6: DPR
+  7: EN_SP
+}
+
+[ROM 1, Segment 0] {
+  0: OE_RAM
+  1: WE_RAM
+  2: EN_IN
+  3: EN_OUT
+  4: VE
+  5: AE
+  6: LD_FB
+  7: LD_FA
+}
+
+[ROM 2, Segment 0] {
+  0: EN_IP
+  1: LD_IP
+  2: EN_D
+  3: LD_D
+  4: CR
+  5: ERR
+  6: UNUSED
+  7: UNUSED
+}
+
+[Address Layout] {
+  0: CYCLE 0
+  1: CYCLE 1
+  2: CYCLE 2
+  3: OPCODE 0
+  4: OPCODE 1
+  5: OPCODE 2
+  6: OPCODE 3
+  7: FLAG 0
+  8: FLAG 1
+  9: FLAG 2
+  10: FLAG 3
+  11: UNUSED
+  12: UNUSED
+}
+```
