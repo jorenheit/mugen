@@ -6,6 +6,8 @@
 #include <sstream>
 #include "util.h"
 
+#define UNREACHABLE assert(false && "UNREACHABLE");
+
 namespace Mugen {
         
     struct Body {
@@ -27,11 +29,15 @@ namespace Mugen {
         
         size_t flag_bits = 0;
         size_t flag_bits_start = 0;
+
+	size_t segment_bits = 0;
+	size_t segment_bits_start = 0;
     };
 
     struct RomSpecs {
-        int word_count;
-        int bits_per_word;
+	size_t rom_count;
+        size_t word_count;
+        size_t bits_per_word;
         size_t address_bits;
     };
 
@@ -49,6 +55,16 @@ namespace Mugen {
 	if (condition) error(args...);
     }
 
+    template <typename ... Args>
+    void warning(Args ... args) {
+	(std::cerr << _file << ":" << _lineNr << ": WARNING: " <<  ... << args) << '\n';
+    }
+
+    template <typename ... Args>
+    void warning_if(bool condition, Args ... args) {
+	if (condition) warning(args...);
+    }
+
     
     void validateIdentifier(std::string const &ident) {
 	for (char c : ident) {
@@ -59,13 +75,12 @@ namespace Mugen {
 	}
 	error_if(ident == "x" || ident == "X", "\"x\" and \"X\" may not be used as identifiers.");
     }
-    
-    std::unordered_map<std::string, size_t> parseSignals(Body const &body) {
+
+    std::vector<std::string> parseSignals(Body const &body, size_t romCount, size_t segmentBits) {
     
         std::istringstream iss(body.str);
-	std::unordered_map<std::string, size_t> result;
+	std::vector<std::string> result;
         std::string ident;
-	size_t idx = 0;
         _lineNr = body.lineNr;
         while (std::getline(iss, ident)) {
 	    trim(ident);
@@ -75,11 +90,24 @@ namespace Mugen {
 	    }
 
 	    validateIdentifier(ident);
-	    bool success = result.insert({ident, idx++}).second;
-	    error_if(!success,
+	    error_if(std::find(result.begin(), result.end(), ident) != result.end(),
 		     "duplicate definition of signal \"", ident, "\".");
+
+	    result.push_back(ident);
 	    ++_lineNr;
         }
+
+	error_if(result.size() > 64, "more than 64 signals declared.");
+
+
+	warning_if((result.size() / 8 < romCount) && (segmentBits > 0),
+		   "with ", result.size(), " signals and ", romCount, " rom chips, using segmented roms is not necessary.");
+	
+	size_t partsAvailable = romCount * (1 << segmentBits);
+        size_t nParts = (result.size() + 7) / 8;
+	error_if(nParts > partsAvailable,
+		 "too many signals declared (", result.size(),"). In this configuration (", romCount,
+		 " rom chip(s), ", segmentBits, " segment bit(s)), a maximum of ", partsAvailable * 8, " signals can be declared.");
         
         return result;
     }
@@ -113,7 +141,7 @@ namespace Mugen {
 		     "expected \"=\" in opcode definition.");
 	    
 	    error_if(operands.size() != 2,
-		     "incorrect opcode format, should be of the form [OPCODE] = [HEX VALUE].");
+		     "incorrect opcode format, should be of the form <OPCODE> = <HEX VALUE>.");
 
 	    auto [ident, value] = constructOpcode(operands[0], operands[1]);
 	    error_if(value >= (1U << maxOpcodeBits),
@@ -148,17 +176,17 @@ namespace Mugen {
 
 	    std::vector<std::string> operands = split(line, ':');
 	    error_if(operands.size() != 2,
-		     "invalid format for address specifier, should be [IDENTIFIER]: [NUMBER OF BITS].");
+		     "invalid format for address specifier, should be <IDENTIFIER>: <NUMBER OF BITS>.");
 
-	    std::string rhs = operands[1];
+	    std::string const &rhs = operands[1];
+	    std::string const &ident = operands[0];
+
 	    int bits;
 	    error_if(!stringToInt(rhs, bits),
 		     "specified number of bits (", rhs, ") is not a valid decimal number.");
-	    error_if(bits <= 0,
+	    error_if(bits <= 0 && ident != "segment",
 		     "number of bits must be a positive integer.");
 
-	    
-	    std::string const &ident = operands[0];
 	    if (ident == "cycle") {
 		error_if(result.cycle_bits > 0,
 			 "multiple definitions of cycle bits.");
@@ -180,7 +208,14 @@ namespace Mugen {
 		result.flag_bits = bits;
 		result.flag_bits_start = count;
 	    }
-	    else error("unknown identifier ", ident, ".");
+	    else if (ident == "segment") {
+		error_if(result.segment_bits > 0,
+			 "multiple definitions of segment bits.");
+
+		result.segment_bits = bits;
+		result.segment_bits_start = count;
+	    }     
+	    else error("unknown identifier \"", ident, "\".");
                         
 	    count += bits;
 	    ++_lineNr;
@@ -213,8 +248,9 @@ namespace Mugen {
 		     "rom specification can only contain at most 1 non-empty line.");
                         
 	    std::vector<std::string> values = split(line, 'x');
-	    error_if(values.size() != 2,
-		     "invalid format for rom specification, should be [NUMBER OF WORDS]x[BITS_PER_WORD].");
+	    error_if(values.size() < 2 || values.size() > 3,
+		     "invalid format for rom specification, should be <NUMBER OF WORDS> x <BITS_PER_WORD> "
+		     "or <NUMBER OF WORDS> x <BITS_PER_WORD> x <NUMBER_OF_CHIPS>.");
 
 	    // Get number of words
 	    {
@@ -230,6 +266,13 @@ namespace Mugen {
 		error_if(result.bits_per_word != 8,
 			 "only 8 bit words are currently supported.");
 	    }
+	    if (values.size() == 3) { // Get number of roms
+		error_if(!stringToInt(values[2], result.rom_count),
+			 "specified number rom chips (", values[2], ") is not a valid decimal number.");
+		error_if(result.rom_count <= 0,
+			 "Number of rom chips (", result.rom_count, ") must be a positive integer.");
+	    }
+	    else result.rom_count = 1;
 	    
 	    done = true;
 	    ++_lineNr;
@@ -280,7 +323,7 @@ namespace Mugen {
 		else if (!std::isspace(ch)){
 		    error("only comments (use #) may appear outside sections.");
 		}
-		break; // ignore all other characters at top level
+		break;
 	    }
 	    case PARSING_SECTION_HEADER: {
 		error_if(ch == '{' || ch == '}',
@@ -360,13 +403,12 @@ namespace Mugen {
 
     std::vector<std::vector<unsigned char>> parseMicrocode(Body const &body,        
 							   RomSpecs const &rom,
-							   std::unordered_map<std::string, size_t> const &signals,
+							   std::vector<std::string> const &signals,
 							   std::unordered_map<std::string, size_t> const &opcodes,
 							   AddressMapping const &mapping) {
-        
-        size_t nParts = (signals.size() + 7) / 8;
+
         std::vector<std::vector<unsigned char>> result;
-        for (size_t part = 0; part != nParts; ++part) {
+        for (size_t chip = 0; chip != rom.rom_count; ++chip) {
 	    result.emplace_back(rom.word_count);
         }
         std::vector<size_t> visited(rom.word_count);
@@ -385,16 +427,17 @@ namespace Mugen {
 	    std::vector<std::string> operands = split(line, "->", true);
 	    error_if(operands.size() == 1,
 		     "expected \"->\" in microcode rule.");
-	    
-	    std::vector<std::string> lhs = operands.size() ? split(operands[0], ':') : std::vector<std::string>{};
+	    error_if(operands.size() != 2,
+		     "invalid format in microcode definition, should be (<OPCODE>:<CYCLE>:<FLAGS> | catch) -> [SIG1], ...");
 
-	    error_if(operands.size() != 2 && lhs.size() != 3, 
-		     "invalid format in microcode definition, should be [OPCODE]:[CYCLE]:[FLAGS] | catch > [SIG1], ...");
+	    bool catchAll = (operands[0] == "catch");
+	    std::vector<std::string> lhs = split(operands[0], ':');
+	    error_if(!catchAll && lhs.size() != 3,
+		     "expected ':' before '->' in rule definition.");
 
 	    // Build address string
 	    std::string addressString(rom.address_bits, 'x');
-	    bool catchAll = (operands[0] == "catch");
-	    
+
 	    // Lambda for inserting bits into the address-string
 	    auto insertIntoAddressString = [&addressString, &rom](std::string const &bitString, int bits_start, int n_bits) {
 		addressString.replace(rom.address_bits - bits_start - n_bits, n_bits, bitString);
@@ -412,7 +455,7 @@ namespace Mugen {
 			}
 		    }
 		    error_if(opcodeStr.empty(),
-			     "opcode ", userStr, " not declared in opcode section.");
+			     "opcode \"", userStr, "\" not declared in opcode section.");
 		    insertIntoAddressString(opcodeStr, mapping.opcode_bits_start, mapping.opcode_bits);
 		}
 	    }
@@ -458,19 +501,19 @@ namespace Mugen {
 	    std::vector<std::string> rhs = split(operands[1], ',');
 	    size_t bitvector = 0;
 	    for (std::string const &signal: rhs) {
-		if (auto const it = signals.find(signal); it != signals.end()) {
-		    bitvector |= (1 << it->second);
+		if (auto const it = std::find(signals.begin(), signals.end(), signal); it != signals.end()) {
+		    bitvector |= (1 << std::distance(signals.begin(), it));
 		}
 		else error("signal \"", signal, "\" not declared in signal section.");
 	    }
 
 
 	    // Lambda that applies 'func' to each match of the address-string
-	    auto for_each_match = [](std::string &bits, auto const &func) -> decltype(func(0)) {
-		auto impl = [&bits, &func](auto const &self, size_t idx) -> decltype(func(0)) {
-		    if (idx == bits.length()) return func(std::stoi(bits, nullptr, 2));
+	    auto for_each_match = [&addressString](auto const &func) -> decltype(func(0)) {
+		auto impl = [&addressString, &func](auto const &self, size_t idx) -> decltype(func(0)) {
+		    if (idx == addressString.length()) return func(std::stoi(addressString, nullptr, 2));
         
-		    char &c = bits[idx];
+		    char &c = addressString[idx];
 		    if (c == '0' || c == '1') {
 			self(self, idx + 1);
 		    }
@@ -479,23 +522,35 @@ namespace Mugen {
 			c = '1'; self(self, idx + 1);
 			c = 'x';
 		    }
-		    else assert(false && "UNREACHABLE");
+		    else UNREACHABLE;
 		};
 		
 		return impl(impl, 0);
 	    };
 
 	    // Find all matching indices and assign the bitvectors to the images.
-	    for_each_match(addressString, [&](int idx) {
-		if (!visited[idx]) {
-		    for (size_t part = 0; part != nParts; ++part) {
-			result[part][idx] = (bitvector >> (8 * part)) & 0xff;
-		    }
-		    visited[idx] = _lineNr;
+	    size_t nSegments = (1 << mapping.segment_bits);
+	    for (size_t segment = 0; segment != nSegments; ++segment) {
+
+		// add segment bits into the address string
+		if (nSegments > 1) {
+		    std::string segmentStr = toBinaryString(segment, mapping.segment_bits);
+		    insertIntoAddressString(segmentStr, mapping.segment_bits_start, mapping.segment_bits);
 		}
-		else error_if(!catchAll,
-			      "rule overlaps with rule previously defined on line ", visited[idx], ".");
-	    });
+
+		// assign part of the bitvector to this segment (for each rom)
+		for_each_match([&](int idx) {
+		    if (!visited[idx]) {
+			for (size_t chip = 0; chip != rom.rom_count; ++chip) {
+			    int chunkIdx = segment * rom.rom_count + chip;
+			    result[chip][idx] = (bitvector >> (8 * chunkIdx)) & 0xff;
+			}
+			visited[idx] = _lineNr;
+		    }
+		    else error_if(!catchAll,
+				  "rule overlaps with rule previously defined on line ", visited[idx], ".");
+		});
+	    }
 	    
 	    ++_lineNr;
         }
@@ -537,7 +592,7 @@ namespace Mugen {
 
         auto rom     = parseRomSpecs(sections["rom"]);
         auto address = parseAddressMapping(sections["address"], rom.address_bits);
-        auto signals = parseSignals(sections["signals"]);
+        auto signals = parseSignals(sections["signals"], rom.rom_count, address.segment_bits);
         auto opcodes = parseOpcodes(sections["opcodes"], address.opcode_bits);
 	
         return parseMicrocode(sections["microcode"], rom, signals, opcodes, address);

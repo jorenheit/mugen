@@ -30,15 +30,25 @@ int main(int argc, char **argv) {
     std::string outFilename = argv[2];
         
     auto images = Mugen::parse(inFilename);
-        
-    for (size_t part = 0; part != images.size(); ++part) {
-	std::string filename = outFilename + ((images.size() > 0) ? ("." + std::to_string(part)) : "");
+
+    std::vector<std::string> files;
+    for (size_t idx = 0; idx != images.size(); ++idx) {
+	std::string filename = outFilename + ((images.size() > 1) ? ("." + std::to_string(idx)) : "");
 	std::ofstream out(filename, std::ios::binary);
 	if (!out) {
 	    std::cerr << "ERROR: Could not open output file \"" << filename << "\".";
 	    return 1;
 	}
-	out.write(reinterpret_cast<char const *>(images[part].data()), images[part].size());
+
+	files.push_back(filename);
+	out.write(reinterpret_cast<char const *>(images[idx].data()), images[idx].size());
 	out.close();
     }
+
+    std::cout << "Successfully generated file(s): \n";
+    for (size_t idx = 0; idx != images.size(); ++idx) {
+	std::cout << files[idx] << '\n';
+    }
+
+    return 0;
 } 

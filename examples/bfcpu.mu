@@ -1,12 +1,13 @@
 # This example shows the microcode specification for the Brainf*ck CPU.
 # For more information on this project, see https://github.com/jorenheit/bfcpu.
 
-[rom] { 8192 x 8 }
+[rom] { 8192 x 8 x 3 }
 
 [address] {
-  cycle:  3
-  opcode: 4
-  flags:  4
+  cycle:   3
+  opcode:  4
+  flags:   4
+#  segment: 2
 }
 
 [signals] {

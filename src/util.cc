@@ -50,12 +50,3 @@ std::string toBinaryString(size_t num, size_t minBits) {
     return trimmed;
 }
 
-bool stringToInt(std::string const &str, int &result, int base) {
-    try {
-	result = std::stoi(str, nullptr, base); }
-    catch (...) {
-	return false;
-    }
-    return true;
-
-}
