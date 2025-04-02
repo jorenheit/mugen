@@ -83,7 +83,7 @@ The address space may be segmented to allow for groups of 8 control signals to b
 ```
 
 ### Signals
-Defines all control signals used in the microcode. At most 64 signals may be declared.
+Defines all control signals used in the microcode. Each signal must be a valid identifier (a combination of alphanumeric characters or underscores) and be listed on a seperate line. At most 64 signals may be declared.
 
 ```
 [signals] {
@@ -96,10 +96,9 @@ Defines all control signals used in the microcode. At most 64 signals may be dec
     #...
 }
 ```
-Each signal has to appear on a new line; the first signal will appear as the least significant bit in the resulting control signal configurations.
 
 #### Signal Indices
-Signals are grouped into chunks of 8 signals. The first chunk will be stored to the first chip, the second to the second chip and so on. When the chips have been segmented, sequential chunks are first stored in segment 0 of the corresponding ROM chips, then to segment 1 and so on. Given `n` available ROM chips, a chunk with index `c` will be stored in ROM `floor(c / n)`, segment `mod(c, n)`. 
+Signals are grouped into chunks of 8. The first chunk will be stored to the first chip, the second to the second chip and so on. When the chips have been segmented, sequential chunks are first stored in segment 0 of the corresponding ROM chips, then to segment 1 and so on. Given `n` available ROM chips, a chunk with index `c` will be stored in ROM `floor(c / n)`, segment `mod(c, n)`. Call Mugen with the `--layout` option for an overview of where each of signals has ended up.
 
 ### Opcodes
 Defines the available opcodes and assigns their numerical values (in hex). Each opcode must be defined on its own line.
