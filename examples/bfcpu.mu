@@ -7,7 +7,6 @@
   cycle:   3
   opcode:  4
   flags:   4
-#  segment: 2
 }
 
 [signals] {

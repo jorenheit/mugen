@@ -99,9 +99,16 @@ namespace Mugen {
 
 	error_if(result.size() > 64, "more than 64 signals declared.");
 
+	size_t nChunk = 1 + result.size() / 8;
+	size_t segmentBitsRequired = bitsNeeded(nChunk / romCount);
 
-	warning_if((result.size() / 8 < romCount) && (segmentBits > 0),
-		   "with ", result.size(), " signals and ", romCount, " rom chips, using segmented roms is not necessary.");
+	bool warned = false;
+	warning_if(nChunk < romCount,
+		   "for ", result.size(), " signals, only ", nChunk, " roms are necessary to store all of them.");
+	warning_if(nChunk == romCount && (segmentBits > 0) && (warned = true),
+		   "for ", result.size(), " signals and ", romCount, " rom chips, using segmented roms is not necessary.");
+	warning_if(segmentBitsRequired < segmentBits && !warned,
+		   "for ", result.size(), " signals, it is sufficient to use only ", segmentBitsRequired," segment bit(s) (when using ", romCount, " ROM chips).");
 	
 	size_t partsAvailable = romCount * (1 << segmentBits);
         size_t nParts = (result.size() + 7) / 8;
@@ -277,15 +284,8 @@ namespace Mugen {
 	    done = true;
 	    ++_lineNr;
         }
-        
-        int n = result.word_count;
-        int count = 0;
-        while (n != 0) {
-	    ++count;
-	    n >>= 1;
-        }
-        result.address_bits = count - 1;
-        
+
+	result.address_bits = bitsNeeded(result.word_count);
         return result;
     }
 
@@ -558,7 +558,46 @@ namespace Mugen {
         return result;                                                                                                                                  
     }
 
-    std::vector<std::vector<unsigned char>> parse(std::string const &filename) {
+
+    std::string reportLayout(RomSpecs const &rom, AddressMapping const &address, std::vector<std::string> const &signals) {
+	std::ostringstream oss;
+	size_t nSegments = (1 << address.segment_bits);
+	for (size_t i = 0; i != rom.rom_count; ++i) {
+	    for (size_t j = 0; j != nSegments; ++j) {
+		size_t chunkIdx = 8 * (j * rom.rom_count + i);
+		oss << "[ROM " << i << ", Segment " << j << "] {\n";
+		for (size_t k = 0; k != 8; ++k) {
+		    size_t signalIdx = chunkIdx + k;
+		    oss << "  " << k << ": " << (signalIdx < signals.size() ? signals[signalIdx] : "UNUSED") << '\n';
+		}
+		oss << "}\n\n";
+	    }
+	}
+
+	std::vector<std::string> layout(rom.address_bits);
+	for (size_t bit = 0; bit != address.opcode_bits; ++bit) {
+	    layout[address.opcode_bits_start + bit] = "OPCODE " + std::to_string(bit);
+	}
+	for (size_t bit = 0; bit != address.cycle_bits; ++bit) {
+	    layout[address.cycle_bits_start + bit] = "CYCLE " + std::to_string(bit);
+	}
+	for (size_t bit = 0; bit != address.flag_bits; ++bit) {
+	    layout[address.flag_bits_start + bit] = "FLAG " + std::to_string(bit);
+	}
+	for (size_t bit = 0; bit != address.segment_bits; ++bit) {
+	    layout[address.segment_bits_start + bit] = "SEGMENT " + std::to_string(bit);
+	}
+
+	oss << "[Address Layout] {\n";
+	for (size_t bit = 0; bit != rom.address_bits; ++bit) {
+	    oss << "  " << bit << ": " << (layout[bit].empty() ? "UNUSED" : layout[bit]) << '\n';
+	}
+	oss << "}\n\n";
+	
+	return oss.str();
+    }
+    
+    std::vector<std::vector<unsigned char>> parse(std::string const &filename, std::string &report) {
 
 	std::ifstream file(filename);
         error_if(!file,
@@ -594,6 +633,10 @@ namespace Mugen {
         auto address = parseAddressMapping(sections["address"], rom.address_bits);
         auto signals = parseSignals(sections["signals"], rom.rom_count, address.segment_bits);
         auto opcodes = parseOpcodes(sections["opcodes"], address.opcode_bits);
+
+	report = reportLayout(rom, address, signals);
+	
+	
 	
         return parseMicrocode(sections["microcode"], rom, signals, opcodes, address);
     }

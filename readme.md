@@ -25,6 +25,12 @@ mugen input.mu microcode.bin
 
 When more than 8 control signals have been defined (and therefore more than a single 8-bit ROM chip has to be used to store the microcode table), multiple files will be generated: microcode.bin.0, microcode.bin.1, etc.
 
+### Printing Layout
+The `--layout` or `-l` flag can be passed to Mugen if you want to see (or save for reference) the resulting memory layout. It will show what signals will be stored in which bit of every ROM chip and provide an overview of how each address-bit has been defined.
+
+```sh
+mugen input.mu microcode.bin --layout
+```
 
 ## Specification File Format
 
@@ -149,4 +155,3 @@ Only the catch rule is allowed to overlap with preceding rules. On every other r
     # ...
 }
 ```
-

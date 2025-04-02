@@ -21,5 +21,6 @@ bool stringToInt(std::string const &str, Int &result, int base = 10) {
 
 }
 
+size_t bitsNeeded(size_t n);
 
 #endif

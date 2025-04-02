@@ -4,7 +4,7 @@
 #include <vector>
 
 namespace Mugen {                                                                                                                                                                                                                        
-    std::vector<std::vector<unsigned char>> parse(std::string const &filename);
+    std::vector<std::vector<unsigned char>> parse(std::string const &filename, std::string &report);
 }
 
 #endif

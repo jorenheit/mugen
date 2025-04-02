@@ -50,3 +50,15 @@ std::string toBinaryString(size_t num, size_t minBits) {
     return trimmed;
 }
 
+
+// Returns the number of bits needed to store values 0 .. n-1
+size_t bitsNeeded(size_t n) {
+    if (n == 0) return 0;
+    size_t result = 0;
+    size_t cmp = 1;
+    while (cmp <= (n - 1)) {
+	cmp <<= 1;
+	++result;
+    }
+    return result;
+}
