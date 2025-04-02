@@ -64,7 +64,7 @@ Address Bit: 13 12 11 10 09 08 07 06 05 04 03 02 01 00
               X  X  X  X  X  F  F  O  O  O  O  C  C  C
 ```
 
-## Segments
+#### Segments
 The address space may be segmented to allow for groups of 8 control signals to be stored in different segments of the same chip. The hardware must then be designed to sequentially load these signals from the different segments by enabling the corresponding segment bits. For example, when using 2 segment bits (4 segments), 24 signals can be stored on the same chip.
 
 ```
@@ -92,7 +92,7 @@ Defines all control signals used in the microcode. At most 64 signals may be dec
 ```
 Each signal has to appear on a new line; the first signal will appear as the least significant bit in the resulting control signal configurations.
 
-## Signal Indices
+#### Signal Indices
 Signals are grouped into chunks of 8 signals. The first chunk will be stored to the first chip, the second to the second chip and so on. When the chips have been segmented, sequential chunks are first stored in segment 0 of the corresponding ROM chips, then to segment 1 and so on. Given `n` available ROM chips, a chunk with index `c` will be stored in ROM `floor(c / n)`, segment `mod(c, n)`. 
 
 ### Opcodes
