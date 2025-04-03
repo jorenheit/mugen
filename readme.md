@@ -70,6 +70,9 @@ Address Bit: 13 12 11 10 09 08 07 06 05 04 03 02 01 00
               X  X  X  X  X  F  F  O  O  O  O  C  C  C
 ```
 
+#### No Flags
+It is possible to define a system where no flags are used (for example when building Ben Eater's 8-bit computer, it is possible to run it in an intermediate stage where it is not Turing Complete yet). Simply assign 0 bits to the flag field of the address or omit the flag-line altogether.
+
 #### Segments
 The address space may be segmented to allow for groups of 8 control signals to be stored in different segments of the same chip. The hardware must then be designed to sequentially load these signals from the different segments by enabling the corresponding segment bits. For example, when using 2 segment bits (4 segments), 24 signals can be stored on the same chip.
 
@@ -98,7 +101,7 @@ Defines all control signals used in the microcode. Each signal must be a valid i
 ```
 
 #### Signal Indices
-Signals are grouped into chunks of 8. The first chunk will be stored to the first chip, the second to the second chip and so on. When the chips have been segmented, sequential chunks are first stored in segment 0 of the corresponding ROM chips, then to segment 1 and so on. Given `n` available ROM chips, a chunk with index `c` will be stored in ROM `floor(c / n)`, segment `mod(c, n)`. Call Mugen with the `--layout` option for an overview of where each of signals has ended up.
+Signals are grouped into chunks of 8. The first chunk will be stored to the first chip, the second to the second chip and so on. When the chips have been segmented, sequential chunks are first stored in segment 0 of the corresponding ROM chips, then to segment 1 and so on. Given `n` available ROM chips, a chunk with index `c` will be stored in ROM `floor(c / n)`, segment `mod(c, n)`. Signals are stored starting from the least significant bit, unless  Mugen is called with the `--msb-first` or `-m` flag. Call Mugen with the `--layout` option for an overview of where each of signals has ended up. 
 
 ### Opcodes
 Defines the available opcodes and assigns their numerical values (in hex). Each opcode must be defined on its own line.
@@ -151,6 +154,17 @@ Only the catch rule is allowed to overlap with preceding rules. On every other r
     # ...
     LDA:2:0x -> MI, IO
     LDA:2:01 -> R0, AI   # will collide with the rule above
+    # ...
+}
+```
+
+#### No Flags
+When the system has no flag bits mapped onto the address (i.e. the flag field in the address-section was left out or assigned 0), the third part of each microcode rule is simply left out.
+
+```
+[microcode] {
+    # ...
+    LDA:2 -> MI, IO
     # ...
 }
 ```
