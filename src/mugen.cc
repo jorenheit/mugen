@@ -197,19 +197,21 @@ namespace Mugen {
 	    int bits;
 	    error_if(!stringToInt(rhs, bits),
 		     "specified number of bits (", rhs, ") is not a valid decimal number.");
-	    error_if(bits <= 0 && ident != "segment",
-		     "number of bits must be a positive integer.");
 
 	    if (ident == "cycle") {
 		error_if(result.cycle_bits > 0,
 			 "multiple definitions of cycle bits.");
-		
+		error_if(bits <= 0,
+		     "number of bits must be a positive integer.");
+
 		result.cycle_bits = bits;
 		result.cycle_bits_start = count;
 	    }
 	    else if (ident == "opcode") {
 		error_if(result.opcode_bits > 0,
 			 "multiple definitions of opcode bits.");
+		error_if(bits <= 0,
+		     "number of bits must be a positive integer.");
 		
 		result.opcode_bits = bits;
 		result.opcode_bits_start = count;
@@ -217,6 +219,8 @@ namespace Mugen {
 	    else if (ident == "flags") {
 		error_if(result.flag_bits > 0,
 			 "multiple definitions of flag bits.");
+		error_if(bits < 0,
+			 "number of bits must be a positive integer or 0 if no flags are used.");
 		
 		result.flag_bits = bits;
 		result.flag_bits_start = count;
@@ -224,6 +228,8 @@ namespace Mugen {
 	    else if (ident == "segment") {
 		error_if(result.segment_bits > 0,
 			 "multiple definitions of segment bits.");
+		error_if(bits < 0,
+			 "number of bits must be a positive integer or 0 if no segments are used.");
 
 		result.segment_bits = bits;
 		result.segment_bits_start = count;
@@ -239,6 +245,11 @@ namespace Mugen {
 		 "Total number of bits used in address specification (", count ,") "
 		 "exceeds number of address lines of the ROM (", maxAddressBits,").");
 
+	error_if(result.opcode_bits == 0,
+		 "number of opcode bits must be specified.");
+	error_if(result.cycle_bits == 0,
+		 "number of cycle bits must be specified.");
+	
         return result;
     }
 
@@ -370,6 +381,7 @@ namespace Mugen {
 			isFirstCharacterOfBody = false;
 		    }
 		    currentBody += ch;
+		    break;
 		}
 		else {
 		    trim(currentSection);
@@ -380,8 +392,9 @@ namespace Mugen {
 		    currentSection.clear();
 		    currentBody.clear();
 		    state = PARSING_TOP_LEVEL;
+		    break;
 		}
-		break;
+		UNREACHABLE;
 	    }
 	    case PARSING_COMMENT: {
 		if (ch == '\n') {
@@ -438,10 +451,6 @@ namespace Mugen {
 	    error_if(operands.size() != 2,
 		     "invalid format in microcode definition, should be (<OPCODE>:<CYCLE>:<FLAGS> | catch) -> [SIG1], ...");
 
-	    bool catchAll = (operands[0] == "catch");
-	    std::vector<std::string> lhs = split(operands[0], ':');
-	    error_if(!catchAll && lhs.size() != 3,
-		     "expected ':' before '->' in rule definition.");
 
 	    // Build address string
 	    std::string addressString(rom.address_bits, 'x');
@@ -450,9 +459,17 @@ namespace Mugen {
 	    auto insertIntoAddressString = [&addressString, &rom](std::string const &bitString, int bits_start, int n_bits) {
 		addressString.replace(rom.address_bits - bits_start - n_bits, n_bits, bitString);
 	    };
-	    
-	    if (!catchAll) // Insert opcode into address string
-	    {
+
+
+	    bool catchAll = (operands[0] == "catch");
+	    if (!catchAll) {
+		std::vector<std::string> lhs = split(operands[0], ':');
+		error_if(!catchAll && (lhs.size() < 2 || lhs.size() > 3),
+			 "expected ':' before '->' in rule definition.");
+
+		if (lhs.size() == 2) lhs.push_back("");
+		
+		// Insert opcode bits
 		std::string userStr = lhs[0];
 		if (userStr != "x" && userStr != "X") {
 		    std::string opcodeStr;
@@ -466,11 +483,9 @@ namespace Mugen {
 			     "opcode \"", userStr, "\" not declared in opcode section.");
 		    insertIntoAddressString(opcodeStr, mapping.opcode_bits_start, mapping.opcode_bits);
 		}
-	    }
-                        
-	    if (!catchAll) // Insert cycle into address string
-	    {
-		std::string userStr = lhs[1];
+
+		// Insert cycle bits
+		userStr = lhs[1];
 		if (userStr != "x" && userStr != "X") {
 		    std::string cycleStr;
 		    int value;
@@ -483,27 +498,28 @@ namespace Mugen {
 		    
 		    insertIntoAddressString(cycleStr, mapping.cycle_bits_start, mapping.cycle_bits);
 		}
-	    }
-                        
-	    if (!catchAll) // Insert flag bits into address string
-	    {
+
+		// Insert flag bits
 		std::string flagStr = lhs[2];
-		error_if(flagStr.length() != mapping.flag_bits, 
-			 "number of flag bits (", flagStr.length(), ") does not match number of flag bits "
-			 "defined in the address section (", mapping.flag_bits, ")", flagStr);
+		if (!flagStr.empty()) {
+		    error_if(flagStr.length() != mapping.flag_bits, 
+			     "number of flag bits (", flagStr.length(), ") does not match number of flag bits "
+			     "defined in the address section (", mapping.flag_bits, ").");
                                 
-		for (char c: flagStr) { 
-		    error_if(c != '0' && c != '1' && c != 'x' && c != 'X',
-			     "invalid flag bit '", c,"'; can only be 0, 1 or x (wildcard).");
+		    for (char c: flagStr) { 
+			error_if(c != '0' && c != '1' && c != 'x' && c != 'X',
+				 "invalid flag bit '", c,"'; can only be 0, 1 or x (wildcard).");
+		    }
+
+		    insertIntoAddressString(flagStr, mapping.flag_bits_start, mapping.flag_bits);
 		}
 
-		insertIntoAddressString(flagStr, mapping.flag_bits_start, mapping.flag_bits);
+		// Check if this is a catchall scenario after all
+		for (char &c: addressString) {
+		    if (c == 'X') c = 'x';
+		}
+		catchAll = (addressString == std::string(rom.address_bits, 'x'));
 	    }
-
-	    for (char &c: addressString) {
-		if (c == 'X') c = 'x';
-	    }
-	    catchAll = (addressString == std::string(rom.address_bits, 'x'));
 	    
 	    // Construct control signal bitvector                   
 	    std::vector<std::string> rhs = split(operands[1], ',');
