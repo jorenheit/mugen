@@ -501,11 +501,11 @@ namespace Mugen {
 
 		// Insert flag bits
 		std::string flagStr = lhs[2];
+		error_if(flagStr.length() != mapping.flag_bits, 
+			 "number of flag bits (", flagStr.length(), ") does not match number of flag bits "
+			 "defined in the address section (", mapping.flag_bits, ").");
+
 		if (!flagStr.empty()) {
-		    error_if(flagStr.length() != mapping.flag_bits, 
-			     "number of flag bits (", flagStr.length(), ") does not match number of flag bits "
-			     "defined in the address section (", mapping.flag_bits, ").");
-                                
 		    for (char c: flagStr) { 
 			error_if(c != '0' && c != '1' && c != 'x' && c != 'X',
 				 "invalid flag bit '", c,"'; can only be 0, 1 or x (wildcard).");
