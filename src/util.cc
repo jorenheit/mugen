@@ -62,3 +62,10 @@ size_t bitsNeeded(size_t n) {
     }
     return result;
 }
+
+unsigned char reverseBits(unsigned char byte) {
+    unsigned char result = (byte << 4) | (byte >> 4); 
+    result = ((result & 0xCC) >> 2) | ((result & 0x33) << 2);
+    result = ((result & 0xAA) >> 1) | ((result & 0x55) << 1);
+    return result;
+}

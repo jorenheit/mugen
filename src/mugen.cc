@@ -277,20 +277,19 @@ namespace Mugen {
 		     "or <NUMBER OF WORDS> x <BITS_PER_WORD> x <NUMBER_OF_CHIPS>.");
 
 	    // Get number of words
-	    {
-		error_if(!stringToInt(values[0], result.word_count),
-			 "specified number of words (", values[0], ") is not a valid decimal number.");
-		error_if(result.word_count <= 0,
-			 "specified number of words (", result.word_count, ") must be a positive integer.");
-	    }
+	    error_if(!stringToInt(values[0], result.word_count),
+		     "specified number of words (", values[0], ") is not a valid decimal number.");
+	    error_if(result.word_count <= 0,
+		     "specified number of words (", result.word_count, ") must be a positive integer.");
+
 	    // Get bits per word
-	    {
-		error_if(!stringToInt(values[1], result.bits_per_word),
-			 "specified number of bits per word (", values[1], ") is not a valid decimal number.");
-		error_if(result.bits_per_word != 8,
-			 "only 8 bit words are currently supported.");
-	    }
-	    if (values.size() == 3) { // Get number of roms
+	    error_if(!stringToInt(values[1], result.bits_per_word),
+		     "specified number of bits per word (", values[1], ") is not a valid decimal number.");
+	    error_if(result.bits_per_word != 8,
+		     "only 8 bit words are currently supported.");
+
+	    // Get number of roms
+	    if (values.size() == 3) { 
 		error_if(!stringToInt(values[2], result.rom_count),
 			 "specified number rom chips (", values[2], ") is not a valid decimal number.");
 		error_if(result.rom_count <= 0,
@@ -426,7 +425,8 @@ namespace Mugen {
 							   RomSpecs const &rom,
 							   std::vector<std::string> const &signals,
 							   std::unordered_map<std::string, size_t> const &opcodes,
-							   AddressMapping const &mapping) {
+							   AddressMapping const &mapping,
+							   bool lsbFirst) {
 
         std::vector<std::vector<unsigned char>> result;
         for (size_t chip = 0; chip != rom.rom_count; ++chip) {
@@ -567,7 +567,8 @@ namespace Mugen {
 		    if (!visited[idx]) {
 			for (size_t chip = 0; chip != rom.rom_count; ++chip) {
 			    int chunkIdx = segment * rom.rom_count + chip;
-			    result[chip][idx] = (bitvector >> (8 * chunkIdx)) & 0xff;
+			    unsigned char byte = (bitvector >> (8 * chunkIdx)) & 0xff;
+			    result[chip][idx] = (lsbFirst ? byte : reverseBits(byte));
 			}
 			visited[idx] = _lineNr;
 		    }
@@ -583,7 +584,7 @@ namespace Mugen {
     }
 
 
-    std::string reportLayout(RomSpecs const &rom, AddressMapping const &address, std::vector<std::string> const &signals) {
+    std::string reportLayout(RomSpecs const &rom, AddressMapping const &address, std::vector<std::string> const &signals, bool lsbFirst) {
 	std::ostringstream oss;
 	size_t nSegments = (1 << address.segment_bits);
 	for (size_t i = 0; i != rom.rom_count; ++i) {
@@ -591,7 +592,7 @@ namespace Mugen {
 		size_t chunkIdx = 8 * (j * rom.rom_count + i);
 		oss << "[ROM " << i << ", Segment " << j << "] {\n";
 		for (size_t k = 0; k != 8; ++k) {
-		    size_t signalIdx = chunkIdx + k;
+		    size_t signalIdx = chunkIdx + (lsbFirst ? k : (7 - k));
 		    oss << "  " << k << ": " << (signalIdx < signals.size() ? signals[signalIdx] : "UNUSED") << '\n';
 		}
 		oss << "}\n\n";
@@ -621,7 +622,7 @@ namespace Mugen {
 	return oss.str();
     }
     
-    std::vector<std::vector<unsigned char>> parse(std::string const &filename, std::string &report) {
+    std::vector<std::vector<unsigned char>> parse(std::string const &filename, std::string &report, bool lsbFirst) {
 
 	std::ifstream file(filename);
         error_if(!file,
@@ -658,11 +659,9 @@ namespace Mugen {
         auto signals = parseSignals(sections["signals"], rom.rom_count, address.segment_bits);
         auto opcodes = parseOpcodes(sections["opcodes"], address.opcode_bits);
 
-	report = reportLayout(rom, address, signals);
+	report = reportLayout(rom, address, signals, lsbFirst);
 	
-	
-	
-        return parseMicrocode(sections["microcode"], rom, signals, opcodes, address);
+        return parseMicrocode(sections["microcode"], rom, signals, opcodes, address, lsbFirst);
     }
 
 } // namespace Mugen
