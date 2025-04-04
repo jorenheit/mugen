@@ -155,6 +155,9 @@ Only the catch rule is allowed to overlap with preceding rules. On every other r
     LDA:2:0x -> MI, IO
     LDA:2:01 -> R0, AI   # will collide with the rule above
     # ...
+    catch    -> ERR, HLT # won't collide by definition
+
+    # Anything below the catch will collide
 }
 ```
 
