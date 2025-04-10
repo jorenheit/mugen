@@ -32,6 +32,8 @@ namespace Mugen {
 
 	size_t segment_bits = 0;
 	size_t segment_bits_start = 0;
+
+	std::vector<std::string> flag_labels;
     };
 
     struct RomSpecs {
@@ -194,49 +196,56 @@ namespace Mugen {
 	    std::string const &rhs = operands[1];
 	    std::string const &ident = operands[0];
 
-	    int bits;
-	    error_if(!stringToInt(rhs, bits),
-		     "specified number of bits (", rhs, ") is not a valid decimal number.");
-
 	    if (ident == "cycle") {
 		error_if(result.cycle_bits > 0,
 			 "multiple definitions of cycle bits.");
-		error_if(bits <= 0,
+		error_if(!stringToInt(rhs, result.cycle_bits),
+		     "specified number of bits (", rhs, ") is not a valid decimal number.");
+		error_if(result.cycle_bits <= 0,
 		     "number of bits must be a positive integer.");
 
-		result.cycle_bits = bits;
 		result.cycle_bits_start = count;
+		count += result.cycle_bits;
 	    }
 	    else if (ident == "opcode") {
 		error_if(result.opcode_bits > 0,
 			 "multiple definitions of opcode bits.");
-		error_if(bits <= 0,
+		error_if(!stringToInt(rhs, result.opcode_bits),
+		     "specified number of bits (", rhs, ") is not a valid decimal number.");
+		error_if(result.opcode_bits <= 0,
 		     "number of bits must be a positive integer.");
 		
-		result.opcode_bits = bits;
 		result.opcode_bits_start = count;
+		count += result.opcode_bits;
 	    }
 	    else if (ident == "flags") {
 		error_if(result.flag_bits > 0,
 			 "multiple definitions of flag bits.");
-		error_if(bits < 0,
+
+		if (!stringToInt(rhs, result.flag_bits)) {
+		    result.flag_labels = split(rhs, ',');
+		    result.flag_bits = result.flag_labels.size();
+		}
+		
+		error_if(result.flag_bits < 0,
 			 "number of bits must be a positive integer or 0 if no flags are used.");
 		
-		result.flag_bits = bits;
 		result.flag_bits_start = count;
+		count += result.flag_bits;
 	    }
 	    else if (ident == "segment") {
 		error_if(result.segment_bits > 0,
 			 "multiple definitions of segment bits.");
-		error_if(bits < 0,
+		error_if(!stringToInt(rhs, result.segment_bits),
+		     "specified number of bits (", rhs, ") is not a valid decimal number.");
+		error_if(result.segment_bits < 0,
 			 "number of bits must be a positive integer or 0 if no segments are used.");
 
-		result.segment_bits = bits;
 		result.segment_bits_start = count;
+		count += result.segment_bits;
 	    }     
 	    else error("unknown identifier \"", ident, "\".");
                         
-	    count += bits;
 	    ++_lineNr;
         }
 
@@ -601,16 +610,18 @@ namespace Mugen {
 
 	std::vector<std::string> layout(rom.address_bits);
 	for (size_t bit = 0; bit != address.opcode_bits; ++bit) {
-	    layout[address.opcode_bits_start + bit] = "OPCODE " + std::to_string(bit);
+	    layout[address.opcode_bits_start + bit] = "OPCODE BIT " + std::to_string(bit);
 	}
 	for (size_t bit = 0; bit != address.cycle_bits; ++bit) {
-	    layout[address.cycle_bits_start + bit] = "CYCLE " + std::to_string(bit);
+	    layout[address.cycle_bits_start + bit] = "CYCLE BIT " + std::to_string(bit);
 	}
 	for (size_t bit = 0; bit != address.flag_bits; ++bit) {
-	    layout[address.flag_bits_start + bit] = "FLAG " + std::to_string(bit);
+	    layout[address.flag_bits_start + bit] = (address.flag_labels.size() > 0) ?
+		address.flag_labels[address.flag_labels.size() - bit - 1] :
+		("FLAG BIT " + std::to_string(bit));
 	}
 	for (size_t bit = 0; bit != address.segment_bits; ++bit) {
-	    layout[address.segment_bits_start + bit] = "SEGMENT " + std::to_string(bit);
+	    layout[address.segment_bits_start + bit] = "SEGMENT BIT " + std::to_string(bit);
 	}
 
 	oss << "[Address Layout] {\n";

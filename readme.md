@@ -73,6 +73,17 @@ Address Bit: 13 12 11 10 09 08 07 06 05 04 03 02 01 00
 #### No Flags
 It is possible to define a system where no flags are used (for example when building Ben Eater's 8-bit computer, it is possible to run it in an intermediate stage where it is not Turing Complete yet). Simply assign 0 bits to the flag field of the address or omit the flag-line altogether.
 
+#### Named Flags
+Alternatively, flags may be named. This has the benefit of self-documentation with respect to the order of the flags in the specification itself. Furthermore, when using the `--layout` option, the provided flag-names will be printed for clarity.
+
+```
+[address] {
+    cycle:  3
+    opcode: 4
+    flags:  C, Z # equivalent to 'flags: 2'
+}
+```
+
 #### Segments
 The address space may be segmented to allow for groups of 8 control signals to be stored in different segments of the same chip. The hardware must then be designed to sequentially load these signals from the different segments by enabling the corresponding segment bits. For example, when using 2 segment bits (4 segments), 24 signals can be stored on the same chip.
 
@@ -220,10 +231,10 @@ Successfully generated 3 images from bfcpu.mu:
   4: OPCODE 1
   5: OPCODE 2
   6: OPCODE 3
-  7: FLAG 0
-  8: FLAG 1
-  9: FLAG 2
-  10: FLAG 3
+  7: Z
+  8: S
+  9: A
+  10: V
   11: UNUSED
   12: UNUSED
 }

@@ -6,7 +6,7 @@
 [address] {
   cycle:   3
   opcode:  4
-  flags:   4
+  flags:   A, V, S, Z
 }
 
 [signals] {
@@ -78,8 +78,7 @@
   LOOP_START:1:x000	-> INC, RS0, RS1
   LOOP_START:2:x000	-> WE_RAM, EN_SP, EN_IP
   LOOP_START:3:x000	-> INC, RS2, CR
-  LOOP_START:1:x10x	-> LD_D, OE_RAM, LD_FA
-  LOOP_START:2:x10x	-> CR
+  LOOP_START:1:x10x	-> LD_D, OE_RAM, LD_FA, CR
   LOOP_START:1:xx1x	-> INC, RS0, RS2
   LOOP_START:2:xx1x	-> INC, RS2, CR
 
@@ -87,8 +86,7 @@
   LOOP_END:2:x001	-> INC, RS0, RS2, CR
   LOOP_END:1:x000	-> EN_SP, OE_RAM, LD_IP
   LOOP_END:2:x000	-> INC, RS2, CR
-  LOOP_END:1:x10x	-> OE_RAM, LD_D, LD_FA
-  LOOP_END:2:x10x	-> CR
+  LOOP_END:1:x10x	-> OE_RAM, LD_D, LD_FA, CR
   LOOP_END:1:xx1x	-> DEC, RS0, RS2
   LOOP_END:2:xx1x	-> INC, RS2, CR
 
