@@ -69,6 +69,8 @@ namespace Mugen {
 
     
     void validateIdentifier(std::string const &ident) {
+	error_if(!isalpha(ident[0]) && ident[0] != '_',
+		 "Identifier \"", ident, "\" does not start with a letter or underscore.");
 	for (char c : ident) {
 	    error_if(std::isspace(c),
 		     "Identifier \"", ident, "\" can not contain whitespace.");
@@ -264,6 +266,7 @@ namespace Mugen {
 		 "Total number of bits used in address specification (", count ,") "
 		 "exceeds number of address lines of the ROM (", maxAddressBits,").");
 
+	// Check if mandatory fields have been set
 	error_if(result.opcode_bits == 0,
 		 "number of opcode bits must be specified.");
 	error_if(result.cycle_bits == 0,
