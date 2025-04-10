@@ -71,12 +71,14 @@ namespace Mugen {
     void validateIdentifier(std::string const &ident) {
 	error_if(!isalpha(ident[0]) && ident[0] != '_',
 		 "Identifier \"", ident, "\" does not start with a letter or underscore.");
+	
 	for (char c : ident) {
 	    error_if(std::isspace(c),
 		     "Identifier \"", ident, "\" can not contain whitespace.");
 	    error_if(!std::isalnum(c) && c != '_',
 		     "Identifier \"", ident, "\" contains invalid character: '", c, "'.");
 	}
+	
 	error_if(ident == "x" || ident == "X", "\"x\" and \"X\" may not be used as identifiers.");
     }
 
@@ -455,7 +457,9 @@ namespace Mugen {
 	    result.emplace_back(rom.word_count);
         }
         std::vector<size_t> visited(rom.word_count);
-        
+	std::vector<bool> signalsUsed(signals.size());
+	auto opcodesCopy = opcodes;
+	
         std::istringstream iss(body.str);
         _lineNr = body.lineNr;
         std::string line;
@@ -497,6 +501,7 @@ namespace Mugen {
 		    std::string opcodeStr;
 		    for (auto const &[ident, value]: opcodes) {
 			if (userStr == ident) {
+			    opcodesCopy.erase(ident);
 			    opcodeStr = toBinaryString(value, mapping.opcode_bits);
 			    break;
 			}
@@ -547,10 +552,18 @@ namespace Mugen {
 	    std::vector<std::string> rhs = split(operands[1], ',');
 	    size_t bitvector = 0;
 	    for (std::string const &signal: rhs) {
-		if (auto const it = std::find(signals.begin(), signals.end(), signal); it != signals.end()) {
-		    bitvector |= (1 << std::distance(signals.begin(), it));
+		bool validSignal = false;
+		for (size_t idx = 0; idx != signals.size(); ++idx) {
+		    if (signals[idx] == signal) {
+			bitvector |= (1 << idx);
+			signalsUsed[idx] = true;
+			validSignal = true;
+			break;
+		    }
 		}
-		else error("signal \"", signal, "\" not declared in signal section.");
+
+		error_if(!validSignal,
+			 "signal \"", signal, "\" not declared in signal section.");
 	    }
 
 
@@ -601,7 +614,17 @@ namespace Mugen {
 	    
 	    ++_lineNr;
         }
-        
+
+	// Raise a warning on unused opcodes
+	for (auto &pair: opcodesCopy)
+	    warning("unused opcode \"", pair.first, "\".");
+
+	// Raise a warning on unused signals
+	for (size_t idx = 0; idx != signals.size(); ++idx) 
+	    warning_if(!signalsUsed[idx],
+		       "unused signal \"", signals[idx], "\".");
+
+	
         return result;                                                                                                                                  
     }
 
