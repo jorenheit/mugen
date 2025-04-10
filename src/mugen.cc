@@ -223,7 +223,17 @@ namespace Mugen {
 			 "multiple definitions of flag bits.");
 
 		if (!stringToInt(rhs, result.flag_bits)) {
+		    // Not a number -> interpret as labels
 		    result.flag_labels = split(rhs, ',');
+		    for (size_t idx = 0; idx != result.flag_labels.size(); ++idx) {
+			validateIdentifier(result.flag_labels[idx]);
+			for (size_t jdx = idx + 1; jdx != result.flag_labels.size(); ++jdx) {
+			    if (idx == jdx) continue;
+			    warning_if(result.flag_labels[idx] == result.flag_labels[jdx],
+				     "duplicate flag \"", result.flag_labels[idx], "\".");
+			}
+		    }
+		    
 		    result.flag_bits = result.flag_labels.size();
 		}
 		
