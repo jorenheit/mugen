@@ -96,6 +96,13 @@ The address space may be segmented to allow for groups of 8 control signals to b
 }
 ```
 
+#### Padding
+By default, Mugen will create images of size `2^(sum of bis)` based on the specified bits in the address section. When not all address lines are used, this will result in images smaller than the actual number of words available on the ROM (see rom-section). The `--pad` or `-p` option can be passed to Mugen to pad the remaining address-space with some value:
+
+```
+mugen spec.mu image.bin --pad 0xff
+```
+
 ### Signals
 Defines all control signals used in the microcode. Each signal must be a valid identifier (a combination of alphanumeric characters or underscores) and be listed on a seperate line. At most 64 signals may be declared.
 
