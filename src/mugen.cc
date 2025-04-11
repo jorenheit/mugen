@@ -4,6 +4,7 @@
 #include <unordered_set>
 #include <algorithm>
 #include <sstream>
+#include "mugen.h"
 #include "util.h"
 
 #define UNREACHABLE assert(false && "UNREACHABLE");
@@ -33,6 +34,7 @@ namespace Mugen {
 	size_t segment_bits = 0;
 	size_t segment_bits_start = 0;
 
+	size_t total_address_bits = 0;
 	std::vector<std::string> flag_labels;
     };
 
@@ -273,7 +275,8 @@ namespace Mugen {
 		 "number of opcode bits must be specified.");
 	error_if(result.cycle_bits == 0,
 		 "number of cycle bits must be specified.");
-	
+
+	result.total_address_bits = count;
         return result;
     }
 
@@ -453,10 +456,11 @@ namespace Mugen {
 							   bool lsbFirst) {
 
         std::vector<std::vector<unsigned char>> result;
-        for (size_t chip = 0; chip != rom.rom_count; ++chip) {
-	    result.emplace_back(rom.word_count);
-        }
-        std::vector<size_t> visited(rom.word_count);
+	size_t imageSize = (1 << mapping.total_address_bits);
+        for (size_t chip = 0; chip != rom.rom_count; ++chip) 
+	    result.emplace_back(imageSize);
+
+        std::vector<size_t> visited(imageSize);
 	std::vector<bool> signalsUsed(signals.size());
 	auto opcodesCopy = opcodes;
 	
@@ -479,11 +483,11 @@ namespace Mugen {
 
 
 	    // Build address string
-	    std::string addressString(rom.address_bits, 'x');
+	    std::string addressString(mapping.total_address_bits, 'x');
 
 	    // Lambda for inserting bits into the address-string
 	    auto insertIntoAddressString = [&addressString, &rom](std::string const &bitString, int bits_start, int n_bits) {
-		addressString.replace(rom.address_bits - bits_start - n_bits, n_bits, bitString);
+		addressString.replace(addressString.length() - bits_start - n_bits, n_bits, bitString);
 	    };
 
 
@@ -608,7 +612,7 @@ namespace Mugen {
 			visited[idx] = _lineNr;
 		    }
 		    else error_if(!catchAll,
-				  "rule overlaps with rule previously defined on line ", visited[idx], ".");
+				  "rule overlaps with rule previously defined on line ", visited[idx], ".", addressString);
 		});
 	    }
 	    
@@ -669,7 +673,7 @@ namespace Mugen {
 	return oss.str();
     }
     
-    std::vector<std::vector<unsigned char>> parse(std::string const &filename, std::string &report, bool lsbFirst) {
+    Result parse(std::string const &filename, bool lsbFirst) {
 
 	std::ifstream file(filename);
         error_if(!file,
@@ -706,9 +710,12 @@ namespace Mugen {
         auto signals = parseSignals(sections["signals"], rom.rom_count, address.segment_bits);
         auto opcodes = parseOpcodes(sections["opcodes"], address.opcode_bits);
 
-	report = reportLayout(rom, address, signals, lsbFirst);
+	Result result;
+	result.report = reportLayout(rom, address, signals, lsbFirst);
+	result.target_rom_capacity = rom.word_count;
+	result.images = parseMicrocode(sections["microcode"], rom, signals, opcodes, address, lsbFirst);
 	
-        return parseMicrocode(sections["microcode"], rom, signals, opcodes, address, lsbFirst);
+        return result;
     }
 
 } // namespace Mugen

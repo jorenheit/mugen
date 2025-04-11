@@ -3,8 +3,15 @@
 
 #include <vector>
 
-namespace Mugen {                                                                                                                                                                                                                        
-    std::vector<std::vector<unsigned char>> parse(std::string const &filename, std::string &report, bool lsbFirst = true);
+namespace Mugen {
+
+    struct Result {
+	std::vector<std::vector<unsigned char>> images;
+	size_t target_rom_capacity;
+	std::string report;
+    };
+    
+    Result parse(std::string const &filename, bool lsbFirst = true);
 }
 
 #endif
