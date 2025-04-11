@@ -593,15 +593,16 @@ namespace Mugen {
 
 		// assign part of the bitvector to this segment (for each rom)
 		for_each_match([&](int idx) {
-		    error_if(visited[idx] && !catchAll,
-			     "rule overlaps with rule previously defined on line ", visited[idx], ".");
-
-		    for (size_t chip = 0; chip != rom.rom_count; ++chip) {
-			int chunkIdx = segment * rom.rom_count + chip;
-			unsigned char byte = (bitvector >> (8 * chunkIdx)) & 0xff;
-			result[chip][idx] = (lsbFirst ? byte : reverseBits(byte));
+		    if (!visited[idx]) {
+			for (size_t chip = 0; chip != rom.rom_count; ++chip) {
+			    int chunkIdx = segment * rom.rom_count + chip;
+			    unsigned char byte = (bitvector >> (8 * chunkIdx)) & 0xff;
+			    result[chip][idx] = (lsbFirst ? byte : reverseBits(byte));
+			}
+			visited[idx] = _lineNr;
 		    }
-		    visited[idx] = _lineNr;
+		    else error_if(!catchAll,
+				  "rule overlaps with rule previously defined on line ", visited[idx], ".");
 		});
 	    }
 	    
