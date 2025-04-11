@@ -13,6 +13,7 @@ int printHelp(std::string const &progName, int ret) {
               << "  -h, --help       Display this help message and exit\n"
               << "  -l, --layout     Print the ROM layout report after generation\n"
 	      << "  -m, --msb-first  Store signals starting from the most significant bit.\n"
+	      << "  -p, --pad VALUE  Pad the remainder of the rom with the supplied value (may be hex).\n"
               << "\nExample:\n"
               << "  " << progName << " myspec.mu microcode.bin --msb-first --layout\n";
 
