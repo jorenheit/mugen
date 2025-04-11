@@ -69,3 +69,4 @@ unsigned char reverseBits(unsigned char byte) {
     result = ((result & 0xAA) >> 1) | ((result & 0x55) << 1);
     return result;
 }
+

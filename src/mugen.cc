@@ -199,68 +199,58 @@ namespace Mugen {
 	    error_if(operands.size() != 2,
 		     "invalid format for address specifier, should be <IDENTIFIER>: <NUMBER OF BITS>.");
 
-	    std::string const &rhs = operands[1];
 	    std::string const &ident = operands[0];
+	    std::string const &rhs = operands[1];
 
+	    auto parseField = [&ident, &rhs, &count](size_t &bits, size_t &start, int minValue, auto &&parseRhs){
+		error_if(bits > 0,
+			 "multiple definitions of \"", ident, "\" bits.");
+
+		int result;
+		error_if(!parseRhs(rhs, result),
+			 "right hand side of \"", ident, "\" (", rhs, ") is not valid. "
+			 "Should be either a number or a list of identifiers (when specifying the flag bits)."); 
+		error_if(result < minValue,
+			 "number of bits must be a positive integer.");
+
+		bits = result;
+		start = count;
+		count += bits;
+		
+	    };
+	    
 	    if (ident == "cycle") {
-		error_if(result.cycle_bits > 0,
-			 "multiple definitions of cycle bits.");
-		error_if(!stringToInt(rhs, result.cycle_bits),
-		     "specified number of bits (", rhs, ") is not a valid decimal number.");
-		error_if(result.cycle_bits <= 0,
-		     "number of bits must be a positive integer.");
-
-		result.cycle_bits_start = count;
-		count += result.cycle_bits;
+		parseField(result.cycle_bits, result.cycle_bits_start, 1, [](auto& ... args) {
+		    return stringToInt(args...);
+		});
 	    }
 	    else if (ident == "opcode") {
-		error_if(result.opcode_bits > 0,
-			 "multiple definitions of opcode bits.");
-		error_if(!stringToInt(rhs, result.opcode_bits),
-		     "specified number of bits (", rhs, ") is not a valid decimal number.");
-		error_if(result.opcode_bits <= 0,
-		     "number of bits must be a positive integer.");
-		
-		result.opcode_bits_start = count;
-		count += result.opcode_bits;
+		parseField(result.opcode_bits, result.opcode_bits_start, 1, [](auto& ... args) {
+		    return stringToInt(args...);
+		});
 	    }
 	    else if (ident == "flags") {
-		error_if(result.flag_bits > 0,
-			 "multiple definitions of flag bits.");
-
-		if (!stringToInt(rhs, result.flag_bits)) {
-		    // Not a number -> interpret as labels
-		    result.flag_labels = split(rhs, ',');
-		    for (size_t idx = 0; idx != result.flag_labels.size(); ++idx) {
-			validateIdentifier(result.flag_labels[idx]);
-			for (size_t jdx = idx + 1; jdx != result.flag_labels.size(); ++jdx) {
-			    if (idx == jdx) continue;
-			    warning_if(result.flag_labels[idx] == result.flag_labels[jdx],
-				     "duplicate flag \"", result.flag_labels[idx], "\".");
-			}
-		    }
+		parseField(result.flag_bits, result.flag_bits_start, 0, [&result](std::string const &str, int &bits) {
+		    if (stringToInt(str, bits)) return true;
 		    
-		    result.flag_bits = result.flag_labels.size();
-		}
-		
-		error_if(result.flag_bits < 0,
-			 "number of bits must be a positive integer or 0 if no flags are used.");
-		
-		result.flag_bits_start = count;
-		count += result.flag_bits;
+		    // Not a number -> interpret as labels
+		    result.flag_labels = split(str, ',');
+		    std::unordered_set<std::string> set;
+		    for (std::string &label: result.flag_labels) {
+			warning_if(!set.insert(label).second,
+				   "duplicate flag \"", label, "\".");
+		    }
+
+		    bits = result.flag_labels.size();
+		    return true;
+		});
 	    }
 	    else if (ident == "segment") {
-		error_if(result.segment_bits > 0,
-			 "multiple definitions of segment bits.");
-		error_if(!stringToInt(rhs, result.segment_bits),
-		     "specified number of bits (", rhs, ") is not a valid decimal number.");
-		error_if(result.segment_bits < 0,
-			 "number of bits must be a positive integer or 0 if no segments are used.");
-
-		result.segment_bits_start = count;
-		count += result.segment_bits;
-	    }     
-	    else error("unknown identifier \"", ident, "\".");
+		parseField(result.segment_bits, result.segment_bits_start, 0, [](auto& ... args) {
+		    return stringToInt(args...);
+		});
+	    }
+	    else error("unknown address field \"", ident, "\".");
                         
 	    ++_lineNr;
         }
@@ -572,8 +562,8 @@ namespace Mugen {
 
 
 	    // Lambda that applies 'func' to each match of the address-string
-	    auto for_each_match = [&addressString](auto const &func) -> decltype(func(0)) {
-		auto impl = [&addressString, &func](auto const &self, size_t idx) -> decltype(func(0)) {
+	    auto for_each_match = [&addressString](auto const &func) {
+		auto impl = [&addressString, &func](auto const &self, size_t idx) {
 		    if (idx == addressString.length()) return func(std::stoi(addressString, nullptr, 2));
         
 		    char &c = addressString[idx];
@@ -595,7 +585,7 @@ namespace Mugen {
 	    size_t nSegments = (1 << mapping.segment_bits);
 	    for (size_t segment = 0; segment != nSegments; ++segment) {
 
-		// add segment bits into the address string
+		// If segmented, add segment bits into the address string
 		if (nSegments > 1) {
 		    std::string segmentStr = toBinaryString(segment, mapping.segment_bits);
 		    insertIntoAddressString(segmentStr, mapping.segment_bits_start, mapping.segment_bits);
@@ -603,16 +593,15 @@ namespace Mugen {
 
 		// assign part of the bitvector to this segment (for each rom)
 		for_each_match([&](int idx) {
-		    if (!visited[idx]) {
-			for (size_t chip = 0; chip != rom.rom_count; ++chip) {
-			    int chunkIdx = segment * rom.rom_count + chip;
-			    unsigned char byte = (bitvector >> (8 * chunkIdx)) & 0xff;
-			    result[chip][idx] = (lsbFirst ? byte : reverseBits(byte));
-			}
-			visited[idx] = _lineNr;
+		    error_if(visited[idx] && !catchAll,
+			     "rule overlaps with rule previously defined on line ", visited[idx], ".");
+
+		    for (size_t chip = 0; chip != rom.rom_count; ++chip) {
+			int chunkIdx = segment * rom.rom_count + chip;
+			unsigned char byte = (bitvector >> (8 * chunkIdx)) & 0xff;
+			result[chip][idx] = (lsbFirst ? byte : reverseBits(byte));
 		    }
-		    else error_if(!catchAll,
-				  "rule overlaps with rule previously defined on line ", visited[idx], ".", addressString);
+		    visited[idx] = _lineNr;
 		});
 	    }
 	    
