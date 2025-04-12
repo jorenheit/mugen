@@ -443,16 +443,21 @@ namespace Mugen {
 							   std::vector<std::string> const &signals,
 							   std::unordered_map<std::string, size_t> const &opcodes,
 							   AddressMapping const &mapping,
-							   bool lsbFirst) {
+							   Options const &opt) {
 
+	size_t const addressBits = (opt.padImages == Options::Padding::CATCH)
+	    ? rom.address_bits
+	    : mapping.total_address_bits;
+	
         std::vector<std::vector<unsigned char>> result;
-	size_t imageSize = (1 << mapping.total_address_bits);
+	size_t imageSize = (1 << addressBits);
         for (size_t chip = 0; chip != rom.rom_count; ++chip) 
 	    result.emplace_back(imageSize);
 
         std::vector<size_t> visited(imageSize);
 	std::vector<bool> signalsUsed(signals.size());
 	auto opcodesCopy = opcodes;
+	bool catchRuleDefined = false;
 	
         std::istringstream iss(body.str);
         _lineNr = body.lineNr;
@@ -472,11 +477,11 @@ namespace Mugen {
 		     "invalid format in microcode definition, should be (<OPCODE>:<CYCLE>:<FLAGS> | catch) -> [SIG1], ...");
 
 
-	    // Build address string
-	    std::string addressString(mapping.total_address_bits, 'x');
+	    // Build address string, fill with wildcards
+	    std::string addressString(addressBits, 'x');
 
 	    // Lambda for inserting bits into the address-string
-	    auto insertIntoAddressString = [&addressString, &rom](std::string const &bitString, int bits_start, int n_bits) {
+	    auto insertIntoAddressString = [&addressString](std::string const &bitString, int bits_start, int n_bits) {
 		addressString.replace(addressString.length() - bits_start - n_bits, n_bits, bitString);
 	    };
 
@@ -541,6 +546,7 @@ namespace Mugen {
 		}
 		catchAll = (addressString == std::string(rom.address_bits, 'x'));
 	    }
+	    if (catchAll) catchRuleDefined = true;
 	    
 	    // Construct control signal bitvector                   
 	    std::vector<std::string> rhs = split(operands[1], ',');
@@ -548,12 +554,12 @@ namespace Mugen {
 	    for (std::string const &signal: rhs) {
 		bool validSignal = false;
 		for (size_t idx = 0; idx != signals.size(); ++idx) {
-		    if (signals[idx] == signal) {
-			bitvector |= (1 << idx);
-			signalsUsed[idx] = true;
-			validSignal = true;
-			break;
-		    }
+		    if (signals[idx] != signal) continue;
+
+		    bitvector |= (1 << idx);
+		    signalsUsed[idx] = true;
+		    validSignal = true;
+		    break;
 		}
 
 		error_if(!validSignal,
@@ -591,20 +597,22 @@ namespace Mugen {
 		    insertIntoAddressString(segmentStr, mapping.segment_bits_start, mapping.segment_bits);
 		}
 
-		// assign part of the bitvector to this segment (for each rom)
+		// Assign part of the bitvector to this segment (for each rom)
 		for_each_match([&](int idx) {
-		    if (!visited[idx]) {
-			for (size_t chip = 0; chip != rom.rom_count; ++chip) {
-			    int chunkIdx = segment * rom.rom_count + chip;
-			    unsigned char byte = (bitvector >> (8 * chunkIdx)) & 0xff;
-			    result[chip][idx] = (lsbFirst ? byte : reverseBits(byte));
-			}
-			visited[idx] = _lineNr;
+		    if (visited[idx]) {
+			error_if(!catchAll,
+				 "rule overlaps with rule previously defined on line ", visited[idx], ".");
+			return;
 		    }
-		    else error_if(!catchAll,
-				  "rule overlaps with rule previously defined on line ", visited[idx], ".");
+			
+		    for (size_t chip = 0; chip != rom.rom_count; ++chip) {
+			int chunkIdx = segment * rom.rom_count + chip;
+			unsigned char byte = (bitvector >> (8 * chunkIdx)) & 0xff;
+			result[chip][idx] = (opt.lsbFirst ? byte : reverseBits(byte));
+		    }
+		    visited[idx] = _lineNr;
 		});
-	    }
+	}
 	    
 	    ++_lineNr;
         }
@@ -618,12 +626,28 @@ namespace Mugen {
 	    warning_if(!signalsUsed[idx],
 		       "unused signal \"", signals[idx], "\".");
 
+	// Raise a warning when padding with catch is enabled but no catch rule was defined
+	error_if(!catchRuleDefined && opt.padImages == Options::Padding::CATCH,
+		 "no catch rule defined. This is mandatory when using '--pad catch'.");
 	
         return result;                                                                                                                                  
     }
 
 
-    std::string reportLayout(RomSpecs const &rom, AddressMapping const &address, std::vector<std::string> const &signals, bool lsbFirst) {
+    void padImages(Result &result, unsigned char padValue) {
+	size_t padSize = (result.target_rom_capacity - result.images[0].size());
+	std::vector<unsigned char> const padVector(padSize, padValue);
+
+	for (auto &image: result.images) {
+	    image.insert(image.end(), padVector.begin(), padVector.end());
+	}
+    }
+    
+    std::string layoutReport(RomSpecs const &rom,
+			     AddressMapping const &address,
+			     std::vector<std::string> const &signals,
+			     Options const &opt) {
+
 	std::ostringstream oss;
 	size_t nSegments = (1 << address.segment_bits);
 	for (size_t i = 0; i != rom.rom_count; ++i) {
@@ -631,7 +655,7 @@ namespace Mugen {
 		size_t chunkIdx = 8 * (j * rom.rom_count + i);
 		oss << "[ROM " << i << ", Segment " << j << "] {\n";
 		for (size_t k = 0; k != 8; ++k) {
-		    size_t signalIdx = chunkIdx + (lsbFirst ? k : (7 - k));
+		    size_t signalIdx = chunkIdx + (opt.lsbFirst ? k : (7 - k));
 		    oss << "  " << k << ": " << (signalIdx < signals.size() ? signals[signalIdx] : "UNUSED") << '\n';
 		}
 		oss << "}\n\n";
@@ -663,7 +687,7 @@ namespace Mugen {
 	return oss.str();
     }
     
-    Result parse(std::string const &filename, bool lsbFirst) {
+    Result parse(std::string const &filename, Options const &opt) {
 
 	std::ifstream file(filename);
         error_if(!file,
@@ -701,10 +725,11 @@ namespace Mugen {
         auto opcodes = parseOpcodes(sections["opcodes"], address.opcode_bits);
 
 	Result result;
-	result.report = reportLayout(rom, address, signals, lsbFirst);
+	result.layout = layoutReport(rom, address, signals, opt);
 	result.target_rom_capacity = rom.word_count;
-	result.images = parseMicrocode(sections["microcode"], rom, signals, opcodes, address, lsbFirst);
-	
+	result.images = parseMicrocode(sections["microcode"], rom, signals, opcodes, address, opt);
+
+	if (opt.padImages == Options::Padding::VALUE) padImages(result, opt.padValue);
         return result;
     }
 

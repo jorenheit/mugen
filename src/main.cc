@@ -32,15 +32,12 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    bool printReport = false;
-    bool lsbFirst = true;
-    bool padImages = false;
-    unsigned char padValue = 0;
+    Mugen::Options opt;
 
     for (int idx = 3; idx != argc; ++idx) {
         std::string flag = argv[idx];
-        if (flag == "-l" || flag == "--layout") printReport = true;
-	else if (flag == "-m" || flag == "--msb-first") lsbFirst = false;
+        if (flag == "-l" || flag == "--layout") opt.printLayout = true;
+	else if (flag == "-m" || flag == "--msb-first") opt.lsbFirst = false;
 	else if (flag == "-p" || flag == "--pad") {
 	    if (idx == argc - 1) {
 		std::cerr << "ERROR: no argument to --pad (-p) option.\n\n";
@@ -48,8 +45,12 @@ int main(int argc, char **argv) {
 	    }
 	    int value = 0;
 	    idx += 1;
+	    if (argv[idx] == std::string("catch")) {
+		opt.padImages = Mugen::Options::Padding::CATCH;
+		continue;
+	    }
 	    if (!stringToInt(argv[idx], value, 16)) {
-		std::cerr << "ERROR: argument passed to --pad (-p) must be a hex value.\n\n";
+		std::cerr << "ERROR: argument passed to --pad (-p) must be a hex value or \"catch\".\n\n";
 		return printHelp(argv[0], 1);
 	    }
 	    if (value > 0xff) {
@@ -57,8 +58,8 @@ int main(int argc, char **argv) {
 		return printHelp(argv[0], 1);
 	    }
 
-	    padImages = true;
-	    padValue = value;
+	    opt.padImages = Mugen::Options::Padding::VALUE;
+	    opt.padValue = value;
 	}
 	else if (flag == "-h" || flag == "--help") return printHelp(argv[0], 0);
         else {
@@ -70,10 +71,8 @@ int main(int argc, char **argv) {
     std::string inFilename = argv[1];
     std::string outFilename = argv[2];
 
-    auto result = Mugen::parse(inFilename, lsbFirst);
-    size_t padSize = padImages ? (result.target_rom_capacity - result.images[0].size()) : 0;
-    std::vector<unsigned char> padVector(padSize, padValue);
-    
+    auto result = Mugen::parse(inFilename, opt);
+
     std::vector<std::string> files;
     for (size_t idx = 0; idx != result.images.size(); ++idx) {
 	std::string filename = outFilename + ((result.images.size() > 1) ? ("." + std::to_string(idx)) : "");
@@ -85,18 +84,17 @@ int main(int argc, char **argv) {
 
 	files.push_back(filename);
 	out.write(reinterpret_cast<char const *>(result.images[idx].data()), result.images[idx].size());
-	out.write(reinterpret_cast<char const *>(padVector.data()), padVector.size());
 	out.close();
     }
 
     std::cout << "Successfully generated " << result.images.size() << " images from " << inFilename <<": \n";
     for (size_t idx = 0; idx != result.images.size(); ++idx) {
 	std::cout << "  " << "ROM " << idx << " : " << files[idx]
-		  << " (" << (result.images[idx].size() + padSize) << " bytes)\n";
+		  << " (" << result.images[idx].size() << " bytes)\n";
     }
 
-    if (printReport) {
-	std::cout << '\n' << result.report << '\n';
+    if (opt.printLayout) {
+	std::cout << '\n' << result.layout << '\n';
     }
     
     return 0;
