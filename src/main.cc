@@ -14,8 +14,9 @@ int printHelp(std::string const &progName, int ret) {
               << "  -l, --layout     Print the ROM layout report after generation\n"
 	      << "  -m, --msb-first  Store signals starting from the most significant bit.\n"
 	      << "  -p, --pad VALUE  Pad the remainder of the rom with the supplied value (may be hex).\n"
+	      << "  -p, --pad catch  Pad the remainder of the rom with the signals specified in the catch-rule.\n"
               << "\nExample:\n"
-              << "  " << progName << " myspec.mu microcode.bin --msb-first --layout\n";
+              << "  " << progName << " myspec.mu microcode.bin --pad catch --msb-first --layout\n";
 
     return ret;
 }

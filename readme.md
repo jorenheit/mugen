@@ -103,6 +103,8 @@ By default, Mugen will create images of size `2^(sum of bis)` based on the speci
 mugen spec.mu image.bin --pad 0xff
 ```
 
+Alternatively, `--pad catch` can be used (only) when a catch-rule was specified in the microcode section (see below). With this option, the catch-rule will also be applied to all addresses outside the addressable space of the ROM. 
+
 ### Signals
 Defines all control signals used in the microcode. Each signal must be a valid identifier (a combination of alphanumeric characters or underscores) and be listed on a seperate line. At most 64 signals may be declared.
 
