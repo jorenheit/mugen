@@ -1,4 +1,4 @@
-<img src="logo.png" alt="Mugen logo" width="200"/>
+<p align="center"><img src="logo.png" alt="Mugen logo" width="200"/></p>
 
 # Mugen
 
