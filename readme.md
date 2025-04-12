@@ -1,5 +1,4 @@
-![Mugen logo](logo.png)
-
+<img src="logo.png" alt="Mugen logo" width="200"/>
 
 # Mugen
 
