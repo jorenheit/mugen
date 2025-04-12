@@ -2,15 +2,14 @@
 
 # Mugen
 
-Mugen is a microcode generator that converts a structured specification file into binary microcode images. These images can be flashed onto ROM chips for use in 8-bit computers, such as Ben Eater's breadboard computer. The tool allows hobbyists to define and customize control signals, instruction sets, and execution sequences for their own CPU designs.
+Mugen is a microcode generator that converts a structured specification file into binary microcode images. These images can be flashed onto ROM chips for use in 8-bit computers, such as Ben Eater's breadboard computer. The tool allows hobbyists to define execution sequences for their own CPU designs in a clear and maintainable way.
 
 
 ## Installation
 
-To build and install Mugen, run the following commands:
+To build and install Mugen, run the following commands from the src folder:
 
 ```sh
-cd src
 make
 sudo make install
 ```
@@ -101,7 +100,7 @@ The address space may be segmented to allow for groups of 8 control signals to b
 #### Padding
 By default, Mugen will create images of size `2^(sum of bis)` based on the specified bits in the address section. When not all address lines are used, this will result in images smaller than the actual number of words available on the ROM (see rom-section) to minimize the time needed to flash the images to the chip(s). The `--pad` or `-p` option can be passed to Mugen to pad the remaining address-space with some hex value:
 
-```
+```sh
 mugen spec.mu image.bin --pad 0xff
 ```
 
@@ -202,9 +201,9 @@ When Mugen is run on the unsegmented BFCPU specification in the examples-folder 
 ```
 $ mugen bfcpu.mu bfcpu.bin --layout
 Successfully generated 3 images from bfcpu.mu: 
-  ROM 0 : bfcpu.bin.0
-  ROM 1 : bfcpu.bin.1
-  ROM 2 : bfcpu.bin.2
+  ROM 0 : bfcpu.bin.0 (2048 bytes)
+  ROM 1 : bfcpu.bin.1 (2048 bytes)
+  ROM 2 : bfcpu.bin.2 (2048 bytes)
 
 [ROM 0, Segment 0] {
   0: HLT
