@@ -1,3 +1,6 @@
+![Mugen logo](logo.png)
+
+
 # Mugen
 
 Mugen is a microcode generator that converts a structured specification file into binary microcode images. These images can be flashed onto ROM chips for use in 8-bit computers, such as Ben Eater's breadboard computer. The tool allows hobbyists to define and customize control signals, instruction sets, and execution sequences for their own CPU designs.
@@ -97,7 +100,7 @@ The address space may be segmented to allow for groups of 8 control signals to b
 ```
 
 #### Padding
-By default, Mugen will create images of size `2^(sum of bis)` based on the specified bits in the address section. When not all address lines are used, this will result in images smaller than the actual number of words available on the ROM (see rom-section). The `--pad` or `-p` option can be passed to Mugen to pad the remaining address-space with some value:
+By default, Mugen will create images of size `2^(sum of bis)` based on the specified bits in the address section. When not all address lines are used, this will result in images smaller than the actual number of words available on the ROM (see rom-section) to minimize the time needed to flash the images to the chip(s). The `--pad` or `-p` option can be passed to Mugen to pad the remaining address-space with some hex value:
 
 ```
 mugen spec.mu image.bin --pad 0xff

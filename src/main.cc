@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
 		return printHelp(argv[0], 1);
 	    }
 	    if (value > 0xff) {
-		std::cerr << "ERROR: value passed to --pad (-p) exceeds 8 bits.\n\n";
+		std::cerr << "ERROR: hex value passed to --pad (-p) exceeds 8 bits.\n\n";
 		return printHelp(argv[0], 1);
 	    }
 
