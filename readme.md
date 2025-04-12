@@ -153,7 +153,7 @@ Describes the control signals for each instruction cycle. Each line specificies 
 }
 ```
 #### Order of Flag Bits
-The order of the flag bits in the rule-definitions is exactly how they will appear on the address lines to the ROM. For example, the rule PLUS:1:01 will map to a situation where bit 0 of the flag-field is 0 and bit 1 is 1. If using named flags, the order is determined by the order in which the flags were declared in the address-section.
+The order of the flag bits in the rule-definitions is exactly how they will appear on the address lines to the ROM. For example, the rule PLUS:1:01 will map to a situation where bit 0 of the flag-field is 1 and bit 1 is 0. If using named flags, the order is determined by the order in which the flags were declared in the address-section.
 
 #### catch
 It might be useful to fill all yet undefined addresses with some kind of error-signal to indicate that the computer ended up in some undefined state. This can be done using wildcards or the reserved `catch` keyword. In either case below, all remaining cells will be assigned the ERR and HLT signal.
