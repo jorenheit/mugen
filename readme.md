@@ -33,6 +33,9 @@ The `--layout` or `-l` flag can be passed to Mugen if you want to see (or save f
 mugen input.mu microcode.bin --layout
 ```
 
+### Debug Mode
+When `--debug` or `-d` option is used, Mugen will start an interactive shell in which you can inspect the result before writing it to disk. Type `help` in this shell for more information.
+
 ## Specification File Format
 
 A Mugen specification file (.mu) consists of the following sections: signals, opcodes, microcode, address and rom. Outside sections, only comments are permitted. Comments start with a `#` and end at the end of the line.
