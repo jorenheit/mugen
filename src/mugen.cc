@@ -4,6 +4,8 @@
 #include <unordered_set>
 #include <algorithm>
 #include <sstream>
+#include <filesystem>
+#include "linenoise/linenoise.h"
 #include "mugen.h"
 #include "util.h"
 
@@ -19,30 +21,6 @@ namespace Mugen {
     struct Opcode {
         std::string ident;
         size_t value;
-    };
-
-    struct AddressMapping {
-        size_t cycle_bits = 0;
-        size_t cycle_bits_start = 0;
-        
-        size_t opcode_bits = 0;
-        size_t opcode_bits_start = 0;
-        
-        size_t flag_bits = 0;
-        size_t flag_bits_start = 0;
-
-	size_t segment_bits = 0;
-	size_t segment_bits_start = 0;
-
-	size_t total_address_bits = 0;
-	std::vector<std::string> flag_labels;
-    };
-
-    struct RomSpecs {
-	size_t rom_count;
-        size_t word_count;
-        size_t bits_per_word;
-        size_t address_bits;
     };
 
     int _lineNr = 0;
@@ -84,10 +62,10 @@ namespace Mugen {
 	error_if(ident == "x" || ident == "X", "\"x\" and \"X\" may not be used as identifiers.");
     }
 
-    std::vector<std::string> parseSignals(Body const &body, size_t romCount, size_t segmentBits) {
+    Signals parseSignals(Body const &body, Result const &result) {
     
         std::istringstream iss(body.str);
-	std::vector<std::string> result;
+	Signals signals;
         std::string ident;
         _lineNr = body.lineNr;
         while (std::getline(iss, ident)) {
@@ -98,36 +76,38 @@ namespace Mugen {
 	    }
 
 	    validateIdentifier(ident);
-	    error_if(std::find(result.begin(), result.end(), ident) != result.end(),
+	    error_if(std::find(signals.begin(), signals.end(), ident) != signals.end(),
 		     "duplicate definition of signal \"", ident, "\".");
 
-	    result.push_back(ident);
+	    signals.push_back(ident);
 	    ++_lineNr;
         }
 
-	error_if(result.size() > 64, "more than 64 signals declared.");
+	error_if(signals.size() > 64, "more than 64 signals declared.");
 
-	size_t nChunk = 1 + result.size() / 8;
-	size_t segmentBitsRequired = bitsNeeded(nChunk / romCount);
+	size_t const romCount = result.rom.rom_count;
+	size_t const segmentBits = result.address.segment_bits;
+	size_t const nChunk = 1 + signals.size() / 8;
+	size_t const segmentBitsRequired = bitsNeeded(nChunk / romCount);
 
 	bool warned = false;
 	warning_if(nChunk < romCount,
-		   "for ", result.size(), " signals, only ", nChunk, " roms are necessary to store all of them.");
+		   "for ", signals.size(), " signals, only ", nChunk, " roms are necessary to store all of them.");
 	warning_if(nChunk == romCount && (segmentBits > 0) && (warned = true),
-		   "for ", result.size(), " signals and ", romCount, " rom chips, using segmented roms is not necessary.");
+		   "for ", signals.size(), " signals and ", romCount, " rom chips, using segmented roms is not necessary.");
 	warning_if(segmentBitsRequired < segmentBits && !warned,
-		   "for ", result.size(), " signals, it is sufficient to use only ", segmentBitsRequired," segment bit(s) (when using ", romCount, " ROM chips).");
+		   "for ", signals.size(), " signals, it is sufficient to use only ", segmentBitsRequired," segment bit(s) (when using ", romCount, " ROM chips).");
 	
 	size_t partsAvailable = romCount * (1 << segmentBits);
-        size_t nParts = (result.size() + 7) / 8;
+        size_t nParts = (signals.size() + 7) / 8;
 	error_if(nParts > partsAvailable,
-		 "too many signals declared (", result.size(),"). In this configuration (", romCount,
+		 "too many signals declared (", signals.size(),"). In this configuration (", romCount,
 		 " rom chip(s), ", segmentBits, " segment bit(s)), a maximum of ", partsAvailable * 8, " signals can be declared.");
         
-        return result;
+        return signals;
     }
 
-    std::unordered_map<std::string, size_t> parseOpcodes(Body const &body, int maxOpcodeBits) {
+    Opcodes parseOpcodes(Body const &body, Result const &result) {
 
 	auto constructOpcode = [](std::string const &lhs, std::string const &rhs) -> std::pair<std::string, size_t> {
 	    validateIdentifier(lhs);
@@ -139,7 +119,7 @@ namespace Mugen {
 
 	
         std::istringstream iss(body.str);
-	std::unordered_map<std::string, size_t> result;
+	Opcodes opcodes;
         std::string line;
         _lineNr = body.lineNr;
 
@@ -159,14 +139,15 @@ namespace Mugen {
 		     "incorrect opcode format, should be of the form <OPCODE> = <HEX VALUE>.");
 
 	    auto [ident, value] = constructOpcode(operands[0], operands[1]);
+	    size_t const maxOpcodeBits = result.address.opcode_bits;
 	    error_if(value >= (1U << maxOpcodeBits),
 		     "value assigned to opcode \"", ident, "\" (", value, ") does not fit inside ", maxOpcodeBits, " bits.");
 
-	    bool success = result.insert({ident, value}).second;
+	    bool success = opcodes.insert({ident, value}).second;
 	    error_if(!success,
 		     "duplicate definition of opcode \"", ident, "\".");
 
-	    for (auto const &[other, otherValue]: result) {
+	    for (auto const &[other, otherValue]: opcodes) {
 		if (other == ident) continue;
 		warning_if(value == otherValue,
 			   "signals \"", ident, "\" and \"", other, "\" are defined with the same value (", value, ").");
@@ -175,18 +156,18 @@ namespace Mugen {
 	    ++_lineNr;
         }
 	
-	return result;
+	return opcodes;
     }
 
 
 
-    AddressMapping parseAddressMapping(Body const &body, int maxAddressBits) {
+    AddressMapping parseAddressMapping(Body const &body, Result const &result) {
 	
         std::istringstream iss(body.str);
-        AddressMapping result;
+        AddressMapping address;
         _lineNr = body.lineNr;   
         std::string line;
-        int count = 0;
+        size_t count = 0;
 
 	while (std::getline(iss, line)) {
 	    trim(line);
@@ -220,33 +201,33 @@ namespace Mugen {
 	    };
 	    
 	    if (ident == "cycle") {
-		parseField(result.cycle_bits, result.cycle_bits_start, 1, [](auto& ... args) {
+		parseField(address.cycle_bits, address.cycle_bits_start, 1, [](auto& ... args) {
 		    return stringToInt(args...);
 		});
 	    }
 	    else if (ident == "opcode") {
-		parseField(result.opcode_bits, result.opcode_bits_start, 1, [](auto& ... args) {
+		parseField(address.opcode_bits, address.opcode_bits_start, 1, [](auto& ... args) {
 		    return stringToInt(args...);
 		});
 	    }
 	    else if (ident == "flags") {
-		parseField(result.flag_bits, result.flag_bits_start, 0, [&result](std::string const &str, int &bits) {
+		parseField(address.flag_bits, address.flag_bits_start, 0, [&address](std::string const &str, int &bits) {
 		    if (stringToInt(str, bits)) return true;
 		    
 		    // Not a number -> interpret as labels
-		    result.flag_labels = split(str, ',');
+		    address.flag_labels = split(str, ',');
 		    std::unordered_set<std::string> set;
-		    for (std::string &label: result.flag_labels) {
+		    for (std::string &label: address.flag_labels) {
 			warning_if(!set.insert(label).second,
 				   "duplicate flag \"", label, "\".");
 		    }
 
-		    bits = result.flag_labels.size();
+		    bits = address.flag_labels.size();
 		    return true;
 		});
 	    }
 	    else if (ident == "segment") {
-		parseField(result.segment_bits, result.segment_bits_start, 0, [](auto& ... args) {
+		parseField(address.segment_bits, address.segment_bits_start, 0, [](auto& ... args) {
 		    return stringToInt(args...);
 		});
 	    }
@@ -256,18 +237,18 @@ namespace Mugen {
         }
 
 
-	error_if(count > maxAddressBits,
+	error_if(count > result.rom.address_bits,
 		 "Total number of bits used in address specification (", count ,") "
-		 "exceeds number of address lines of the ROM (", maxAddressBits,").");
+		 "exceeds number of address lines of the ROM (", result.rom.address_bits, ").");
 
 	// Check if mandatory fields have been set
-	error_if(result.opcode_bits == 0,
+	error_if(address.opcode_bits == 0,
 		 "number of opcode bits must be specified.");
-	error_if(result.cycle_bits == 0,
+	error_if(address.cycle_bits == 0,
 		 "number of cycle bits must be specified.");
 
-	result.total_address_bits = count;
-        return result;
+	address.total_address_bits = count;
+        return address;
     }
 
 
@@ -438,21 +419,21 @@ namespace Mugen {
     }
 
 
-    std::vector<std::vector<unsigned char>> parseMicrocode(Body const &body,        
-							   RomSpecs const &rom,
-							   std::vector<std::string> const &signals,
-							   std::unordered_map<std::string, size_t> const &opcodes,
-							   AddressMapping const &mapping,
-							   Options const &opt) {
+    std::vector<Image> parseMicrocode(Body const &body, Result const &result, Options const &opt) {
 
+	auto const &rom = result.rom;
+	auto const &address = result.address;
+	auto const &signals = result.signals;
+	auto const &opcodes = result.opcodes;
+	
 	size_t const addressBits = (opt.padImages == Options::Padding::CATCH)
 	    ? rom.address_bits
-	    : mapping.total_address_bits;
+	    : address.total_address_bits;
 	
-        std::vector<std::vector<unsigned char>> result;
+        std::vector<Image> images;
 	size_t imageSize = (1 << addressBits);
         for (size_t chip = 0; chip != rom.rom_count; ++chip) 
-	    result.emplace_back(imageSize);
+	    images.emplace_back(imageSize);
 
         std::vector<size_t> visited(imageSize);
 	std::vector<bool> signalsUsed(signals.size());
@@ -481,8 +462,8 @@ namespace Mugen {
 	    std::string addressString(addressBits, 'x');
 
 	    // Lambda for inserting bits into the address-string
-	    auto insertIntoAddressString = [&addressString](std::string const &bitString, int bits_start, int n_bits) {
-		addressString.replace(addressString.length() - bits_start - n_bits, n_bits, bitString);
+	    auto insertIntoAddressString = [&addressString](std::string const &bitString, int bits_start) {
+		addressString.replace(addressString.length() - bits_start - bitString.length(), bitString.length(), bitString);
 	    };
 
 
@@ -501,13 +482,13 @@ namespace Mugen {
 		    for (auto const &[ident, value]: opcodes) {
 			if (userStr == ident) {
 			    opcodesCopy.erase(ident);
-			    opcodeStr = toBinaryString(value, mapping.opcode_bits);
+			    opcodeStr = toBinaryString(value, address.opcode_bits);
 			    break;
 			}
 		    }
 		    error_if(opcodeStr.empty(),
 			     "opcode \"", userStr, "\" not declared in opcode section.");
-		    insertIntoAddressString(opcodeStr, mapping.opcode_bits_start, mapping.opcode_bits);
+		    insertIntoAddressString(opcodeStr, address.opcode_bits_start);
 		}
 
 		// Insert cycle bits
@@ -518,18 +499,18 @@ namespace Mugen {
 		    error_if(!stringToInt(userStr, value),
 			     "cycle number (", userStr, ") is not a valid decimal number.");
 
-		    cycleStr = toBinaryString(value, mapping.cycle_bits);
-		    error_if(cycleStr.length() > mapping.cycle_bits, 
-			     "cycle number (", value, ") does not fit inside ", mapping.cycle_bits, " bits");
+		    cycleStr = toBinaryString(value, address.cycle_bits);
+		    error_if(cycleStr.length() > address.cycle_bits, 
+			     "cycle number (", value, ") does not fit inside ", address.cycle_bits, " bits");
 		    
-		    insertIntoAddressString(cycleStr, mapping.cycle_bits_start, mapping.cycle_bits);
+		    insertIntoAddressString(cycleStr, address.cycle_bits_start);
 		}
 
 		// Insert flag bits
 		std::string flagStr = lhs[2];
-		error_if(flagStr.length() != mapping.flag_bits, 
+		error_if(flagStr.length() != address.flag_bits, 
 			 "number of flag bits (", flagStr.length(), ") does not match number of flag bits "
-			 "defined in the address section (", mapping.flag_bits, ").");
+			 "defined in the address section (", address.flag_bits, ").");
 
 		if (!flagStr.empty()) {
 		    for (char c: flagStr) { 
@@ -537,7 +518,7 @@ namespace Mugen {
 				 "invalid flag bit '", c,"'; can only be 0, 1 or x (wildcard).");
 		    }
 
-		    insertIntoAddressString(flagStr, mapping.flag_bits_start, mapping.flag_bits);
+		    insertIntoAddressString(flagStr, address.flag_bits_start);
 		}
 
 		// Check if this is a catchall scenario after all
@@ -588,13 +569,13 @@ namespace Mugen {
 	    };
 
 	    // Find all matching indices and assign the bitvectors to the images.
-	    size_t nSegments = (1 << mapping.segment_bits);
+	    size_t nSegments = (1 << address.segment_bits);
 	    for (size_t segment = 0; segment != nSegments; ++segment) {
 
 		// If segmented, add segment bits into the address string
 		if (nSegments > 1) {
-		    std::string segmentStr = toBinaryString(segment, mapping.segment_bits);
-		    insertIntoAddressString(segmentStr, mapping.segment_bits_start, mapping.segment_bits);
+		    std::string segmentStr = toBinaryString(segment, address.segment_bits);
+		    insertIntoAddressString(segmentStr, address.segment_bits_start);
 		}
 
 		// Assign part of the bitvector to this segment (for each rom)
@@ -608,11 +589,11 @@ namespace Mugen {
 		    for (size_t chip = 0; chip != rom.rom_count; ++chip) {
 			int chunkIdx = segment * rom.rom_count + chip;
 			unsigned char byte = (bitvector >> (8 * chunkIdx)) & 0xff;
-			result[chip][idx] = (opt.lsbFirst ? byte : reverseBits(byte));
+			images[chip][idx] = (opt.lsbFirst ? byte : reverseBits(byte));
 		    }
 		    visited[idx] = _lineNr;
 		});
-	}
+	    }
 	    
 	    ++_lineNr;
         }
@@ -630,12 +611,12 @@ namespace Mugen {
 	error_if(!catchRuleDefined && opt.padImages == Options::Padding::CATCH,
 		 "no catch rule defined. This is mandatory when using '--pad catch'.");
 	
-        return result;                                                                                                                                  
+        return images;                                                                                                                                  
     }
 
 
     void padImages(Result &result, unsigned char padValue) {
-	size_t padSize = (result.target_rom_capacity - result.images[0].size());
+	size_t padSize = (result.rom.word_count - result.images[0].size());
 	std::vector<unsigned char> const padVector(padSize, padValue);
 
 	for (auto &image: result.images) {
@@ -643,51 +624,50 @@ namespace Mugen {
 	}
     }
     
-    std::string layoutReport(RomSpecs const &rom,
-			     AddressMapping const &address,
-			     std::vector<std::string> const &signals,
-			     Options const &opt) {
+    std::string layoutReport(Result const &result, Options const &opt) {
 
 	std::ostringstream oss;
-	size_t nSegments = (1 << address.segment_bits);
-	for (size_t i = 0; i != rom.rom_count; ++i) {
+	size_t nSegments = (1 << result.address.segment_bits);
+	for (size_t i = 0; i != result.rom.rom_count; ++i) {
 	    for (size_t j = 0; j != nSegments; ++j) {
-		size_t chunkIdx = 8 * (j * rom.rom_count + i);
+		size_t chunkIdx = 8 * (j * result.rom.rom_count + i);
 		oss << "[ROM " << i << ", Segment " << j << "] {\n";
 		for (size_t k = 0; k != 8; ++k) {
 		    size_t signalIdx = chunkIdx + (opt.lsbFirst ? k : (7 - k));
-		    oss << "  " << k << ": " << (signalIdx < signals.size() ? signals[signalIdx] : "UNUSED") << '\n';
+		    oss << "  " << k << ": " << (signalIdx < result.signals.size() ? result.signals[signalIdx] : "UNUSED") << '\n';
 		}
 		oss << "}\n\n";
 	    }
 	}
 
-	std::vector<std::string> layout(rom.address_bits);
-	for (size_t bit = 0; bit != address.opcode_bits; ++bit) {
-	    layout[address.opcode_bits_start + bit] = "OPCODE BIT " + std::to_string(bit);
+	std::vector<std::string> layout(result.rom.address_bits);
+	for (size_t bit = 0; bit != result.address.opcode_bits; ++bit) {
+	    layout[result.address.opcode_bits_start + bit] = "OPCODE BIT " + std::to_string(bit);
 	}
-	for (size_t bit = 0; bit != address.cycle_bits; ++bit) {
-	    layout[address.cycle_bits_start + bit] = "CYCLE BIT " + std::to_string(bit);
+	for (size_t bit = 0; bit != result.address.cycle_bits; ++bit) {
+	    layout[result.address.cycle_bits_start + bit] = "CYCLE BIT " + std::to_string(bit);
 	}
-	for (size_t bit = 0; bit != address.flag_bits; ++bit) {
-	    layout[address.flag_bits_start + bit] = (address.flag_labels.size() > 0) ?
-		address.flag_labels[address.flag_labels.size() - bit - 1] :
+	for (size_t bit = 0; bit != result.address.flag_bits; ++bit) {
+	    layout[result.address.flag_bits_start + bit] = (result.address.flag_labels.size() > 0) ?
+		result.address.flag_labels[result.address.flag_labels.size() - bit - 1] :
 		("FLAG BIT " + std::to_string(bit));
 	}
-	for (size_t bit = 0; bit != address.segment_bits; ++bit) {
-	    layout[address.segment_bits_start + bit] = "SEGMENT BIT " + std::to_string(bit);
+	for (size_t bit = 0; bit != result.address.segment_bits; ++bit) {
+	    layout[result.address.segment_bits_start + bit] = "SEGMENT BIT " + std::to_string(bit);
 	}
 
 	oss << "[Address Layout] {\n";
-	for (size_t bit = 0; bit != rom.address_bits; ++bit) {
+	for (size_t bit = 0; bit != result.rom.address_bits; ++bit) {
 	    oss << "  " << bit << ": " << (layout[bit].empty() ? "UNUSED" : layout[bit]) << '\n';
 	}
-	oss << "}\n\n";
+	oss << "}\n";
 	
 	return oss.str();
     }
+
+
     
-    Result parse(std::string const &filename, Options const &opt) {
+    Result generate(std::string const &filename, Options const &opt) {
 
 	std::ifstream file(filename);
         error_if(!file,
@@ -719,18 +699,314 @@ namespace Mugen {
 		     "missing section: \"", name, "\".");
 	}
 
-        auto rom     = parseRomSpecs(sections["rom"]);
-        auto address = parseAddressMapping(sections["address"], rom.address_bits);
-        auto signals = parseSignals(sections["signals"], rom.rom_count, address.segment_bits);
-        auto opcodes = parseOpcodes(sections["opcodes"], address.opcode_bits);
-
 	Result result;
-	result.layout = layoutReport(rom, address, signals, opt);
-	result.target_rom_capacity = rom.word_count;
-	result.images = parseMicrocode(sections["microcode"], rom, signals, opcodes, address, opt);
+        result.rom     = parseRomSpecs(sections["rom"]);
+        result.address = parseAddressMapping(sections["address"], result);
+        result.signals = parseSignals(sections["signals"], result);
+        result.opcodes = parseOpcodes(sections["opcodes"], result);
+	result.layout  = layoutReport(result, opt);
+	result.images  = parseMicrocode(sections["microcode"], result, opt);
 
 	if (opt.padImages == Options::Padding::VALUE) padImages(result, opt.padValue);
         return result;
     }
 
+    // Debug mode
+
+    void printState(std::vector<bool> const &state, Result const &result) {
+	std::ostringstream labelLine;
+	std::ostringstream valueLine;
+	std::ostringstream delimLine;
+
+	labelLine << "|";
+	valueLine << "|";
+	delimLine << "+";
+	for (size_t idx = 0; idx != state.size(); ++idx) {
+	    std::string label = result.address.flag_labels.empty() ?
+		" FLAG " + std::to_string(result.address.flag_bits - idx - 1) + " ":
+		" " + result.address.flag_labels[idx] + " ";
+
+	    std::string value(label.length(), ' ');
+	    value.replace(label.length() / 2, 1, std::to_string(state[result.address.flag_bits - idx - 1]));
+
+	    labelLine << label << "|";
+	    valueLine << value << "|";
+	    delimLine << std::string(label.length(), '-') << '+';
+	}
+
+	std::cout << delimLine.str() << '\n'
+		  << labelLine.str() << '\n'
+		  << delimLine.str() << '\n'
+		  << valueLine.str() << '\n'
+		  << delimLine.str() << '\n';
+
+    }
+    
+    bool setOrReset(std::string const &cmd, std::vector<std::string> const &args, std::vector<bool> &state, Result const &result) {
+	bool error = false;
+	for (size_t idx = 1; idx != args.size(); ++idx) {
+	    std::string const &flag  = args[idx];
+	    if (flag == "*") {
+		for (auto &&val: state) val = (cmd == "set");
+		return true;
+	    }
+		    
+	    size_t flagBit = -1;
+	    if (!stringToInt(flag, flagBit)) {
+		if (result.address.flag_labels.empty()) {
+		    std::cout << "Specification file does not specify flag names, "
+			"so its must be a bit-indices (0 - " << result.address.flag_bits << ") or \"*\".\n";
+		    error = true;
+		    break;
+		}
+		for (flagBit = 0; flagBit != result.address.flag_bits; ++flagBit) {
+		    if (result.address.flag_labels[flagBit] == flag) {
+			flagBit = result.address.flag_bits - flagBit - 1;
+			break;
+		    }
+		}
+	    }
+	    if (flagBit == static_cast<size_t>(-1) || flagBit >= result.address.flag_bits) {
+		std::cout << "Invalid flag \"" << flag << "\".\n";
+		error = true;
+		break;
+	    }
+
+	    state[flagBit] = (cmd == "set");
+	}
+
+	return !error;
+    }    
+
+
+    void runOpcode(std::string const &opcode, std::vector<bool> const &state, Result const &result) {
+	if (!result.opcodes.contains(opcode)) {
+	    std::cout << "Opcode \"" << opcode << "\" not specified in specification file.\n";
+	    return;
+	}
+
+	// Build address string
+	std::string addressString(result.address.total_address_bits, '0');
+	auto insertIntoAddressString = [&addressString](std::string const &bitString, int bits_start) {
+	    addressString.replace(addressString.length() - bits_start - bitString.length(), bitString.length(), bitString);
+	};
+
+	// Insert opcode bits
+	std::string opcodeBits = toBinaryString(result.opcodes.find(opcode)->second, result.address.opcode_bits);
+	insertIntoAddressString(opcodeBits, result.address.opcode_bits_start);
+
+	// Insert flag bits
+	std::string flagBits(result.address.flag_bits, ' ');
+	for (size_t idx = 0; idx != result.address.flag_bits; ++idx)
+	    flagBits[flagBits.length() - idx - 1] = state[idx] ? '1' : '0';
+	insertIntoAddressString(flagBits, result.address.flag_bits_start);
+
+	// Iterate over cycles and collect signals on every cycle
+	size_t const maxCycles = (1 << result.address.cycle_bits);
+	for (size_t cycle = 0; cycle != maxCycles; ++cycle) {
+	    Signals activeSignals;
+
+	    // Insert cycle bits
+	    std::string cycleBits = toBinaryString(cycle, result.address.cycle_bits);
+	    insertIntoAddressString(cycleBits, result.address.cycle_bits_start);
+	    size_t const address = std::stoi(addressString, nullptr, 2);
+
+	    // Iterate over segments
+	    size_t nSegments = (1 << result.address.segment_bits);
+	    for (size_t segment = 0; segment != nSegments; ++segment) {
+
+		// Insert segment bits (if segmented)
+		if (nSegments > 1) {
+		    std::string segmentStr = toBinaryString(segment, result.address.segment_bits);
+		    insertIntoAddressString(segmentStr, result.address.segment_bits_start);
+		}
+
+		// Iterate over roms and fetch signals
+		for (size_t romIndex = 0; romIndex != result.rom.rom_count; ++romIndex) {
+		    unsigned char word = result.images[romIndex][address];
+		    for (size_t bit = 0; bit != result.rom.bits_per_word; ++bit) {
+			if (word & (1 << bit)) {
+			    size_t signalIndex = (segment * result.rom.rom_count + romIndex) * result.rom.bits_per_word + bit;
+			    activeSignals.push_back(result.signals[signalIndex]);
+			}
+		    }
+		}
+	    }
+
+	    // Print list of signals active on this cycle
+	    std::cout << "  " << cycle << ": ";
+	    for (std::string const &signal: activeSignals) {
+		std::cout << signal << (signal != activeSignals.back() ? ", " : "");
+			
+	    }
+	    std::cout << '\n';
+	}
+    }
+
+    void printOpcodes(Result const &result) {
+	std::vector<std::string> sorted(1 << result.address.opcode_bits);
+	size_t maxWidth = 0;
+	for (auto const &[str, value]: result.opcodes) {
+	    sorted[value] = str;
+	    if (str.length() > maxWidth) maxWidth = str.length();
+	}
+	for (size_t value = 0; value != sorted.size(); ++value) {
+	    if (sorted[value].empty()) continue;
+	    std::cout << std::setw(maxWidth + 2) << std::setfill(' ') << sorted[value]
+		      << " = 0x" << std::setw(2) << std::setfill('0') << std::hex << value << '\n';
+	}
+    }
+
+    void printInfo(Result const &result, std::string const &outFileBase) {
+
+	auto property = [](std::string const &str) -> std::ostream& {
+	    return (std::cout << std::setw(15) << std::setfill(' ') << str << ": ");
+	};
+	
+	size_t nImages = result.images.size();
+	property("#images") << nImages << " -> ";
+	for (size_t idx = 0; idx != nImages; ++idx) {
+	    std::cout << outFileBase;
+	    if (nImages > 1) {
+		std::cout << ("." + std::to_string(idx));
+		if (idx != nImages - 1) {
+		    std::cout << ", ";
+		}
+	    }
+	}
+	std::cout << "\n";
+
+	property("image size") << result.images[0].size() << " bytes\n";
+
+	property("segmented") << (result.address.segment_bits > 0 ? "yes" : "no");
+	if (result.address.segment_bits > 0)
+	    std::cout << ", " << (1 << result.address.segment_bits) << " segments per image.";
+	std::cout << '\n';
+
+	property("#signals") << result.signals.size() << '\n';
+	property("#opcodes") << result.opcodes.size() << '\n';
+    }
+    
+    void printHelp() {
+	std::cout << "Available commands:\n"
+	    "  help    - Display this text.\n"
+	    "  info    - Display image information.\n"
+	    "  opcodes - Display a list op available opcodes and their values.\n"
+	    "  layout  - Display the memory layout (signal allocation and address breakdown.\n"
+	    "  state   - Show the current flag-state.\n"
+	    "  set     - Set one or multiple flags (by name or index, seperated by a space).\n"
+	    "            Examples: \"set C\", \"set 0 1\", \"set *\"\n"
+	    "  reset   - Reset on or multiple flags.\n"
+	    "  run     - Display activated signals on subsequent cycles when a certain opcode\n"
+	    "            is run when the processor is in the current state. Example: \"run ADD\".\n"
+	    "  write   - Write the results to their files and quit.\n"
+	    "  exit    - Quit the program without writing the result to file(s).\n";
+    }
+
+    template <typename ... Args>
+    void debug_error(Args const & ... args) {
+	(std::cout << ... << args) << '\n';
+	std::cout << "Type \"help\" for more information.\n";
+    }
+    
+    bool debug(std::string const &progName, std::string const &specFile, std::string const &outFileBase, Result const &result) {
+
+	// Construct prompt and helper function (lambda) that wraps linenoise
+	std::string const prompt = std::filesystem::path(progName).filename().string() + "[" + specFile + "]$ ";
+	auto promptAndGetInput = [&prompt]() -> std::pair<std::string, bool> {
+	    char *line = linenoise(prompt.c_str());
+	    if (line == nullptr) return {"", false};
+	    
+	    linenoiseHistoryAdd(line);
+	    std::string input(line);
+	    linenoiseFree(line);
+	    return {input, true};
+	};
+
+	// Start interactive session -> return true/false to indicate if the images should be writen to disk
+	std::vector<bool> state(result.address.flag_bits);
+	while (true) {
+
+	    // Get user input and split into parts
+	    auto [input, good] = promptAndGetInput();
+	    if (!good) break;
+	    auto parts = split(input, ' ');
+	    if (parts.empty()) continue;
+
+	    // Execute command
+	    std::string const &cmd = parts[0];
+	    if (cmd == "state") {
+		if (parts.size() > 1) {
+		    debug_error("\"opcode\" command does not expect any arguments.");
+		    continue;
+		}
+		
+		printState(state, result);
+	    }
+	    else if (cmd == "set" || cmd == "reset") {
+		if (parts.size() < 2) {
+		    debug_error("\"", cmd, "\" command expects at least 1 flag name, index or \"*\".");
+		    continue;
+		}
+
+		if (setOrReset(cmd, parts, state, result))
+		    printState(state, result);
+	    }
+	    else if (cmd == "run") {
+		if (parts.size() != 2) {
+		    debug_error("\"run\" command expects a single argument (opcode).");
+		    continue;		    
+		}
+		runOpcode(parts[1], state, result);
+	    }
+	    else if (cmd == "opcodes") {
+		if (parts.size() != 1) {
+		    debug_error("\"opcodes\" command does not expect any arguments.");
+		    continue;
+		}
+		
+		printOpcodes(result);
+	    }
+	    else if (cmd == "layout") {
+		if (parts.size() != 1) {
+		    debug_error("\"layout\" command does not expect any arguments.");
+		    continue;
+		}
+		std::cout << result.layout;
+	    }
+	    else if (cmd == "help") {
+		printHelp();
+	    }
+	    else if (cmd == "info") {
+		if (parts.size() != 1) {
+		    debug_error("\"info\" command does not expect any arguments.");
+		    continue;
+		}
+
+		printInfo(result, outFileBase);
+	    }
+	    else if (cmd == "write") {
+		if (parts.size() != 1) {
+		    debug_error("\"write\" command does not expect any arguments.");
+		    continue;
+		}
+
+		return true;
+	    }
+	    else if (cmd == "exit") {
+		if (parts.size() != 1) {
+		    debug_error("\"exit\" command does not expect any arguments.");
+		    continue;
+		}
+		
+		return false;
+	    }
+	    else {
+		debug_error("Unknown command \"", cmd, "\".");
+	    }
+	}
+
+	return false;
+    }
+    
 } // namespace Mugen

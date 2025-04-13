@@ -2,8 +2,37 @@
 #define PARSER_H
 
 #include <vector>
+#include <unordered_map>
 
 namespace Mugen {
+
+    struct RomSpecs {
+	size_t rom_count;
+        size_t word_count;
+        size_t bits_per_word;
+        size_t address_bits;
+    };
+    
+    struct AddressMapping {
+        size_t cycle_bits = 0;
+        size_t cycle_bits_start = 0;
+        
+        size_t opcode_bits = 0;
+        size_t opcode_bits_start = 0;
+        
+        size_t flag_bits = 0;
+        size_t flag_bits_start = 0;
+
+	size_t segment_bits = 0;
+	size_t segment_bits_start = 0;
+
+	size_t total_address_bits = 0;
+	std::vector<std::string> flag_labels;
+    };
+
+    using Opcodes = std::unordered_map<std::string, size_t>;
+    using Signals = std::vector<std::string>;
+    using Image = std::vector<unsigned char>;
 
     struct Options {
 	enum class Padding {
@@ -19,12 +48,17 @@ namespace Mugen {
     };
     
     struct Result {
-	std::vector<std::vector<unsigned char>> images;
-	size_t target_rom_capacity;
+	std::vector<Image> images;
 	std::string layout;
+
+	Opcodes opcodes;
+	AddressMapping address;
+	Signals signals;
+	RomSpecs rom;
     };
-    
-    Result parse(std::string const &filename, Options const &opt);
+
+    Result generate(std::string const &specFile, Options const &opt);
+    bool debug(std::string const &progName, std::string const &specFile, std::string const &outFileBase, Result const &result);
 }
 
 #endif

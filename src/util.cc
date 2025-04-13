@@ -28,7 +28,7 @@ std::vector<std::string> split(std::string const &str, std::string const &token,
     while ((current = str.find(token, prev)) != std::string::npos) {
 	std::string part = str.substr(prev, current - prev);
 	trim(part);
-	result.push_back(part);
+	if (allowEmpty || !part.empty()) result.push_back(part);
 	prev = current + token.length();
     }
     std::string last = str.substr(prev);
