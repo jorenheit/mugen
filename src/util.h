@@ -12,13 +12,13 @@ std::string toBinaryString(size_t num, size_t minBits);
 
 template <typename Int>
 bool stringToInt(std::string const &str, Int &result, int base = 10) {
-    size_t pos;
-    try {
-	result = std::stoi(str, &pos, base); }
-    catch (...) {
-	return false;
-    }
-    return (pos == str.size());
+  size_t pos;
+  try {
+    result = std::stoi(str, &pos, base); }
+  catch (...) {
+    return false;
+  }
+  return (pos == str.size());
 }
 
 size_t bitsNeeded(size_t n);
