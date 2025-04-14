@@ -946,15 +946,16 @@ namespace Mugen {
     // Start interactive session -> return true/false to indicate if the images should be writen to disk
     std::cout << "<Mugen Debug> Type \"help\" for a list of available commands.\n\n";
     while (true) {
-      // Get user input and split into parts
       auto [input, good] = promptAndGetInput();
-      if (!good) break;
+      if (!good) return false;
+
       auto args = split(input, ' ');
       if (args.empty()) continue;
+
       auto [quit, write] = cli.exec(args);
       if (quit) return write;
     }
-    return false;
+    UNREACHABLE;
 
   create_cli:
 #define COMMAND [&](CommandLine::CommandArgs const &args)
