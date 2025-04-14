@@ -901,30 +901,30 @@ namespace Mugen {
   
     void printHelp() {
 	std::cout << "Available commands:\n"
-	    "  help    - Display this text.\n"
-	    "  info    - Display image information.\n"
-	    "  opcodes - Display a list of opcodes and their values.\n"
-	    "  signals - Display a list of signals.\n"
-	    "  layout  - Display the memory layout (signal allocation and address breakdown).\n"
-	    "  flags   - Display the current flag-state.\n"
-	    "  set     - Set one or multiple flags (by name or index, seperated by a space).\n"
-	    "            Examples: \"set C\", \"set 0 1\", \"set *\"\n"
-	    "  reset   - Reset one or multiple flags (same syntax as \"set\").\n"
-	    "  run     - Display activated signals on subsequent cycles when a certain opcode\n"
-	    "            is run when the processor is in the current state.\n" 
-	    "            Example: \"run ADD\"\n"
-	    "            An optional second argument can be provided to specify the number of cycles.\n"
-	    "            If this argument is omitted, all possible cycles will be handled.\n"
-	    "            Example: \"run ADD 4\"\n"
-	    "  write   - Write the results to disk and quit.\n"
-	    "  exit    - Quit the program without writing the result to file(s).\n";
+	    "  help   (h) - Display this text.\n"
+	    "  info   (i) - Display image information.\n"
+	    "  opcodes    - Display a list of opcodes and their values.\n"
+	    "  signals    - Display a list of signals.\n"
+	    "  layout     - Display the memory layout (signal allocation and address breakdown).\n"
+	    "  flags  (f) - Display the current flag-state.\n"
+	    "  set    (s) - Set one or multiple flags (by name or index, seperated by a space).\n"
+	    "               Examples: \"set C\", \"set 0 1\", \"set *\"\n"
+	    "  reset  (r) - Reset one or multiple flags (same syntax as \"set\").\n"
+	    "  run        - Display activated signals on subsequent cycles when a certain opcode\n"
+	    "               is run when the processor is in the current state.\n" 
+	    "               Example: \"run ADD\"\n"
+	    "               An optional second argument can be provided to specify the number of cycles.\n"
+	    "               If this argument is omitted, all possible cycles will be handled.\n"
+	    "               Example: \"run ADD 4\"\n"
+	    "  write  (w) - Write the results to disk and quit.\n"
+	    "  exit   (q) - Quit the program without writing the results to disk.\n";
     }
     
 #include "command_line.h"
     bool debug(std::string const &progName, std::string const &specFile, std::string const &outFileBase, Result const &result) {
     
 	// Construct prompt and helper function (lambda) that wraps linenoise
-	std::string const prompt = std::filesystem::path(progName).filename().string() + "[" + specFile + "]$ ";
+	std::string const prompt = "[" + specFile + "]$ ";
 	auto promptAndGetInput = [&prompt]() -> std::pair<std::string, bool> {
 	    char *line = linenoise(prompt.c_str());
 	    if (line == nullptr) return {"", false};
@@ -944,6 +944,7 @@ namespace Mugen {
 
     run_cli:
 	// Start interactive session -> return true/false to indicate if the images should be writen to disk
+	std::cout << "<Mugen Debug> Type \"help\" for a list of available commands.\n\n";
 	while (true) {
 	    // Get user input and split into parts
 	    auto [input, good] = promptAndGetInput();
