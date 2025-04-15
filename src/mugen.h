@@ -55,11 +55,13 @@ namespace Mugen {
     Signals signals;
     RomSpecs rom;
     bool lsbFirst;
+
+    std::string specificationFilename;
   };
 
   Result generate(std::string const &specFile, Options const &opt);
   std::string layoutReport(Result const &result);
-  bool debug(std::string const &specFile, std::string const &outFileBase, Result const &result);
+  bool debug(Result const &result, std::string const &outFile);
 }
 
 #endif

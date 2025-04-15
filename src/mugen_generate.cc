@@ -704,6 +704,8 @@ namespace Mugen {
     result.images   = parseMicrocode(sections["microcode"], result, opt);
     result.lsbFirst = opt.lsbFirst;
     
+    result.specificationFilename = filename;
+    
     if (opt.padImages == Options::Padding::VALUE) padImages(result, opt.padValue);
     return result;
   }

@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
   auto result = Mugen::generate(inFilename, opt);
   bool writeResult = true;
   if (debugMode) {
-    writeResult = Mugen::debug(inFilename, outFilename, result);
+    writeResult = Mugen::debug(result, outFilename);
   }
   
   if (writeResult) {

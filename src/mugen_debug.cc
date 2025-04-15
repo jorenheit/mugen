@@ -202,10 +202,10 @@ namespace Mugen {
 #include "command_line.h"
   CommandLine generateCommandLine(std::string const &outFileBase, std::vector<bool> &state, Result const &result);
 
-  bool debug(std::string const &specFile, std::string const &outFileBase, Result const &result) {
+  bool debug(Result const &result, std::string const &outFileBase) {
     
     // Construct prompt and helper function (lambda) that wraps linenoise
-    std::string const prompt = "[" + specFile + "]$ ";
+    std::string const prompt = "[" + result.specificationFilename + "]$ ";
     auto promptAndGetInput = [&prompt]() -> std::pair<std::string, bool> {
       char *line = linenoise(prompt.c_str());
       if (line == nullptr) return {"", false};
