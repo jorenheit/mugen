@@ -6,7 +6,7 @@
 [address] {
   cycle:   3
   opcode:  4
-  flags:   A, V, S, Z
+  flags:   V, A, S, Z
 }
 
 [signals] {

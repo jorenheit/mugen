@@ -111,7 +111,6 @@ namespace Mugen {
       // Insert cycle bits
       std::string cycleBits = toBinaryString(cycle, result.address.cycle_bits);
       insertIntoAddressString(cycleBits, result.address.cycle_bits_start);
-      size_t const address = std::stoi(addressString, nullptr, 2);
       
       // Iterate over segments
       size_t nSegments = (1 << result.address.segment_bits);
@@ -122,6 +121,7 @@ namespace Mugen {
           std::string segmentStr = toBinaryString(segment, result.address.segment_bits);
           insertIntoAddressString(segmentStr, result.address.segment_bits_start);
         }
+	size_t const address = std::stoi(addressString, nullptr, 2);
         
         // Iterate over roms and fetch signals
         for (size_t romIndex = 0; romIndex != result.rom.rom_count; ++romIndex) {
