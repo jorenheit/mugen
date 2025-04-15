@@ -304,7 +304,7 @@ namespace Mugen {
       "  See \"help set\" for more details.\n"
     );      
     
-    cli.add({"run"}, COMMAND {
+    cli.add({"run", "exec", "x"}, COMMAND {
         if (args.size() < 2) {
           debug_error(args[0], "command expects at least one argument (run <opcode>).");
           return;
@@ -338,7 +338,7 @@ namespace Mugen {
       "     run ADD 2\n"
     );
     
-    cli.add({"signals"}, COMMAND {
+    cli.add({"signals", "S"}, COMMAND {
         if (args.size() != 1) {
           debug_error(args[0], "command does not expect any arguments.");
         }
@@ -347,7 +347,7 @@ namespace Mugen {
       "Display the list of signals."
     );
     
-    cli.add({"opcodes"}, COMMAND {
+    cli.add({"opcodes", "o"}, COMMAND {
         if (args.size() != 1) {
           debug_error(args[0], "command does not expect any arguments.");
         }
@@ -356,7 +356,7 @@ namespace Mugen {
       "Display the list of opcodes and their values."
     );
     
-    cli.add({"layout"}, COMMAND {
+    cli.add({"layout", "l"}, COMMAND {
         if (args.size() != 1) {
           debug_error(args[0], "command does not expect any arguments.");
         }

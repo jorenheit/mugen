@@ -68,7 +68,6 @@ public:
       commandStrings.push_back(str);
       descriptions.push_back(description);
     }
-  
     assert(commandStrings.size() == descriptions.size());
     
     std::cout << "\nAvailable commands:\n";
