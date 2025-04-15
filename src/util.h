@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <bitset>
+#include <cassert>
 
 void trim(std::string &str);
 std::vector<std::string> split(std::string const &str, char const c, bool allowEmpty = false);
@@ -23,5 +24,7 @@ bool stringToInt(std::string const &str, Int &result, int base = 10) {
 
 size_t bitsNeeded(size_t n);
 unsigned char reverseBits(unsigned char byte);
+
+#define UNREACHABLE assert(false && "UNREACHABLE");
 
 #endif
