@@ -7,7 +7,6 @@ int printHelp(std::string const &progName, int ret = 0) {
   std::cout << "Usage: " << progName << " <specification-file (.mu)> <output-file> [OPTIONS]\n\n"
             << "Mugen is a microcode generator that converts a specification file\n"
             << "into microcode images suitable for flashing onto ROM chips.\n"
-            << "Optionally, the layout report can be printed using the --layout or -l flag.\n"
             << "See https://github.com/jorenheit/mugen for more help.\n\n"
             << "Options:\n"
             << "  -h, --help       Display this help message and exit\n"
