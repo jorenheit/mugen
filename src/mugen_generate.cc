@@ -621,19 +621,19 @@ namespace Mugen {
     }
   }
   
-  std::string layoutReport(Result const &result, Options const &opt) {
+  std::string layoutReport(Result const &result) {
     
     std::ostringstream oss;
     size_t nSegments = (1 << result.address.segment_bits);
     for (size_t i = 0; i != result.rom.rom_count; ++i) {
       for (size_t j = 0; j != nSegments; ++j) {
         size_t chunkIdx = 8 * (j * result.rom.rom_count + i);
-        oss << "[ROM " << i << ", Segment " << j << "] {\n";
+        oss << "  [ROM " << i << ", Segment " << j << "] {\n";
         for (size_t k = 0; k != 8; ++k) {
-          size_t signalIdx = chunkIdx + (opt.lsbFirst ? k : (7 - k));
-          oss << "  " << k << ": " << (signalIdx < result.signals.size() ? result.signals[signalIdx] : "UNUSED") << '\n';
+          size_t signalIdx = chunkIdx + (result.lsbFirst ? k : (7 - k));
+          oss << "    " << k << ": " << (signalIdx < result.signals.size() ? result.signals[signalIdx] : "UNUSED") << '\n';
         }
-        oss << "}\n\n";
+        oss << "  }\n\n";
       }
     }
     
@@ -653,11 +653,11 @@ namespace Mugen {
       layout[result.address.segment_bits_start + bit] = "SEGMENT BIT " + std::to_string(bit);
     }
     
-    oss << "[Address Layout] {\n";
+    oss << "  [Address Layout] {\n";
     for (size_t bit = 0; bit != result.rom.address_bits; ++bit) {
-      oss << "  " << bit << ": " << (layout[bit].empty() ? "UNUSED" : layout[bit]) << '\n';
+      oss << "    " << bit << ": " << (layout[bit].empty() ? "UNUSED" : layout[bit]) << '\n';
     }
-    oss << "}\n";
+    oss << "  }\n";
     
     return oss.str();
   }
@@ -697,12 +697,12 @@ namespace Mugen {
     }
     
     Result result;
-    result.rom     = parseRomSpecs(sections["rom"]);
-    result.address = parseAddressMapping(sections["address"], result);
-    result.signals = parseSignals(sections["signals"], result);
-    result.opcodes = parseOpcodes(sections["opcodes"], result);
-    result.layout  = layoutReport(result, opt);
-    result.images  = parseMicrocode(sections["microcode"], result, opt);
+    result.rom      = parseRomSpecs(sections["rom"]);
+    result.address  = parseAddressMapping(sections["address"], result);
+    result.signals  = parseSignals(sections["signals"], result);
+    result.opcodes  = parseOpcodes(sections["opcodes"], result);
+    result.images   = parseMicrocode(sections["microcode"], result, opt);
+    result.lsbFirst = opt.lsbFirst;
     
     if (opt.padImages == Options::Padding::VALUE) padImages(result, opt.padValue);
     return result;

@@ -93,14 +93,14 @@ int main(int argc, char **argv) {
       out.close();
     }
     
-    std::cout << "Successfully generated " << result.images.size() << " images from " << inFilename <<": \n";
+    std::cout << "Successfully generated " << result.images.size() << " images from " << inFilename <<": \n\n";
     for (size_t idx = 0; idx != result.images.size(); ++idx) {
-      std::cout << "  " << "ROM " << idx << " : " << files[idx]
+      std::cout << "  " << "ROM " << idx << ": " << files[idx]
                 << " (" << result.images[idx].size() << " bytes)\n";
     }
     
     if (opt.printLayout) {
-      std::cout << '\n' << result.layout;
+      std::cout << '\n' << layoutReport(result);
     }
   }
   

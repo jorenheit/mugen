@@ -360,7 +360,7 @@ namespace Mugen {
         if (args.size() != 1) {
           debug_error(args[0], "command does not expect any arguments.");
         }
-        else std::cout << result.layout;
+        else std::cout << layoutReport(result);
       },
       "Display the memory layout of the images."
     );

@@ -49,15 +49,16 @@ namespace Mugen {
     
   struct Result {
     std::vector<Image> images;
-    std::string layout;
 
     Opcodes opcodes;
     AddressMapping address;
     Signals signals;
     RomSpecs rom;
+    bool lsbFirst;
   };
 
   Result generate(std::string const &specFile, Options const &opt);
+  std::string layoutReport(Result const &result);
   bool debug(std::string const &specFile, std::string const &outFileBase, Result const &result);
 }
 
