@@ -3,7 +3,7 @@
 #include "mugen.h"
 #include "util.h"
 
-int printHelp(std::string const &progName, int ret) {
+int printHelp(std::string const &progName, int ret = 0) {
   std::cout << "Usage: " << progName << " <specification-file (.mu)> <output-file> [OPTIONS]\n\n"
             << "Mugen is a microcode generator that converts a specification file\n"
             << "into microcode images suitable for flashing onto ROM chips.\n"
@@ -25,13 +25,11 @@ int printHelp(std::string const &progName, int ret) {
 int main(int argc, char **argv) {
   
   if (argc == 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {
-    printHelp(argv[0], 0);
-    return 0;
+    return printHelp(argv[0]);
   }
   if (argc < 3) {
     std::cerr << "ERROR: Invalid number of arguments.\n\n";
-    printHelp(argv[0], 1);
-    return 1;
+    return printHelp(argv[0], 1);
   }
   
   bool debugMode = false;
