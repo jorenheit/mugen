@@ -7,11 +7,9 @@ Mugen is a microcode generator that converts a structured specification file int
 
 ## Installation
 
-To build and install Mugen, run the following commands:
+To build and install Mugen, run the following commands from the src folder:
 
 ```sh
-git clone https://github.com/jorenheit/mugen
-cd mugen/src
 make
 sudo make install
 ```
@@ -47,7 +45,7 @@ The C/C++ sourcefiles can be included and linked to your C or C++ project. Depen
   namespace Mugen {
 	constexpr size_t IMAGE_SIZE /* = value */;
 	constexpr size_t N_IMAGES /* = value */;
-    unsigned char const images[N_IMAGES][IMAGE_SIZE];
+    extern unsigned char const images[N_IMAGES][IMAGE_SIZE];
   }
   
   // C Header
