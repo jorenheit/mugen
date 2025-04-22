@@ -51,7 +51,7 @@ The C/C++ sourcefiles can be included and linked to your C or C++ project. Depen
   // C Header
   #define IMAGE_SIZE // value
   #define N_IMAGES // value
-  unsigned char const mugen_images[N_IMAGES][IMAGE_SIZE];
+  extern unsigned char const mugen_images[N_IMAGES][IMAGE_SIZE];
   ```
 
 ### Printing Layout
