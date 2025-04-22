@@ -1,8 +1,10 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include <string>
 #include <vector>
 #include <unordered_map>
+#include <memory>
 
 namespace Mugen {
 
@@ -62,6 +64,38 @@ namespace Mugen {
   Result generate(std::string const &specFile, Options const &opt);
   std::string layoutReport(Result const &result);
   bool debug(Result const &result, std::string const &outFile);
+
+  struct WriteResult {
+    bool success = false;
+    std::string report;
+  };
+  
+  class Writer {
+  protected:
+    std::string const _filename;
+  public:
+    Writer(std::string const &file):
+      _filename(file)
+    {}
+    
+    static std::unique_ptr<Writer> get(std::string const &filename);
+    virtual WriteResult write(Result const &result) = 0;
+    virtual std::vector<std::string> extensions() const = 0;
+  };
+
+  struct BinaryFileWriter: public Writer {
+    using Writer::Writer;
+    virtual WriteResult write(Result const &result) override;
+    virtual std::vector<std::string> extensions() const override;
+  };
+
+  struct CPPWriter: public Writer {
+    using Writer::Writer;
+    virtual WriteResult write(Result const &result) override;
+    virtual std::vector<std::string> extensions() const override;
+  };
+
+  using Writers = std::tuple<BinaryFileWriter, CPPWriter>;
 }
 
 #endif

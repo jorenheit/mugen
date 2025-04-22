@@ -9,8 +9,8 @@ BINDIR   := $(PREFIX)/bin
 # Targets to build
 TARGETS  := mugen
 
-MUGEN_SRCS    := mugen.cc mugen_generate.cc mugen_debug.cc util.cc
-MUGEN_OBJS    := mugen.o  mugen_generate.o mugen_debug.o util.o linenoise/linenoise.o
+MUGEN_SRCS    := mugen.cc mugen_generate.cc mugen_debug.cc mugen_writer.cc binarywriter.cc cppwriter.cc util.cc
+MUGEN_OBJS    := mugen.o  mugen_generate.o mugen_debug.o mugen_writer.o binarywriter.o cppwriter.o util.o linenoise/linenoise.o
 
 .PHONY: all install clean
 

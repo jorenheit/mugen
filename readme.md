@@ -18,13 +18,41 @@ This will compile the source code and install the `mugen` binary into `/usr/loca
 
 ## Usage
 
-Run Mugen with a specification file to generate the microcode image(s):
+Run Mugen with a specification file to generate one or more output-files:
 
 ```sh
 mugen input.mu microcode.bin
 ```
+Depending on the extension of the output file, different output is generated.
 
-When multiple ROM chips are used (as specified in the rom section, see below), multiple files will be generated, e.g. microcode.bin.0, microcode.bin.1, etc.
+| Extension           | Output                        |
+|---------------------|-------------------------------|
+| .bin, .rom          | Binary files                  |
+| .c, .cc, .cpp, .cxx | C/C++ source and header file. |
+
+When multiple ROM chips are used (as specified in the rom section, see below), multiple files may be generated, e.g. microcode.bin.0, microcode.bin.1, etc.
+
+### C/C++ Source files
+The C/C++ sourcefiles can be included and linked to your C or C++ project. Depending on wether you're using a C or C++ compiler, the generated microcode images will be available in the `mugen_images` (C) or `Mugen::images` (C++) variables. These are 2D arrays of `unsigned char`, where the first index is the image-index and the second index is the byte-index (or address to the ROM). Furthermore, the constants `N_IMAGES` and `IMAGE_SIZE` are available to iterate over the `images`.
+
+  ```sh
+  $ mugen spec.mu microcode.cc
+  Successfully created CPP source files: microcode.cc, microcode.h.
+  ```
+
+  ```cpp
+  // C++ Header
+  namespace Mugen {
+	constexpr size_t IMAGE_SIZE /* = value */;
+	constexpr size_t N_IMAGES /* = value */;
+    unsigned char const images[N_IMAGES][IMAGE_SIZE];
+  }
+  
+  // C Header
+  #define IMAGE_SIZE // value
+  #define N_IMAGES // value
+  unsigned char const mugen_images[N_IMAGES][IMAGE_SIZE];
+  ```
 
 ### Printing Layout
 The `--layout` or `-l` flag can be passed to Mugen if you want to see (or save for reference) the resulting memory layout. It will show what signals will be stored in which bit of every ROM chip and provide an overview of how each address-bit has been defined.

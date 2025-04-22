@@ -5,9 +5,10 @@
 
 int printHelp(std::string const &progName, int ret = 0) {
   std::cout << "Usage: " << progName << " <specification-file (.mu)> <output-file> [OPTIONS]\n\n"
-            << "Mugen is a microcode generator that converts a specification file\n"
-            << "into microcode images suitable for flashing onto ROM chips.\n"
-            << "See https://github.com/jorenheit/mugen for more help.\n\n"
+	    << "Supported output-file extensions:\n"
+	    << "  .bin, .rom           -> Generate binary file.\n"
+	    << "  .c, .cpp, .cc, .cxx  -> Generate C/C++ source file\n"
+	    << "\n"
             << "Options:\n"
             << "  -h, --help       Display this help message and exit\n"
             << "  -l, --layout     Print the ROM layout report after generation\n"
@@ -16,7 +17,8 @@ int printHelp(std::string const &progName, int ret = 0) {
             << "  -p, --pad catch  Pad the remainder of the rom with the signals specified in the catch-rule.\n"
             << "  -d, --debug      Run Mugen in an interactive debug mode. Type \"help\" for more information.\n"
             << "\nExample:\n"
-            << "  " << progName << " myspec.mu microcode.bin --pad catch --msb-first --layout\n";
+            << "  " << progName << " myspec.mu microcode.bin --pad catch --msb-first --layout\n"
+            << "See https://github.com/jorenheit/mugen for more help.\n";
   
   return ret;
 }
@@ -79,26 +81,16 @@ int main(int argc, char **argv) {
   }
   
   if (writeResult) {
-    std::vector<std::string> files;
-    for (size_t idx = 0; idx != result.images.size(); ++idx) {
-      std::string filename = outFilename + ((result.images.size() > 1) ? ("." + std::to_string(idx)) : "");
-      std::ofstream out(filename, std::ios::binary);
-      if (!out) {
-        std::cerr << "ERROR: Could not open output file \"" << filename << "\".";
-        return 1;
-      }
-      
-      files.push_back(filename);
-      out.write(reinterpret_cast<char const *>(result.images[idx].data()), result.images[idx].size());
-      out.close();
+    auto writer = Mugen::Writer::get(outFilename); // get a writer object based on the filename (extension)
+    if (!writer) {
+      std::cerr << "ERROR: unsupported file extension.\n\n";
+      return printHelp(argv[0], 1);
     }
     
-    std::cout << "Successfully generated " << result.images.size() << " images from " << inFilename <<": \n\n";
-    for (size_t idx = 0; idx != result.images.size(); ++idx) {
-      std::cout << "  " << "ROM " << idx << ": " << files[idx]
-                << " (" << result.images[idx].size() << " bytes)\n";
-    }
-    
+    auto [success, report] = writer->write(result);
+    if (!success) return 1;
+    std::cout << report << '\n';
+
     if (opt.printLayout) {
       std::cout << '\n' << layoutReport(result);
     }
