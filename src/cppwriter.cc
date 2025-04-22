@@ -1,0 +1,112 @@
+#include <iostream>
+#include <iomanip>
+#include <fstream>
+#include <sstream>
+#include <cassert>
+#include <filesystem>
+
+#include "mugen.h"
+
+std::vector<std::string> Mugen::CPPWriter::extensions() const {
+  return {".cc", ".cpp", ".cxx", ".c"};
+}
+
+std::string header = R"(
+#ifndef MUGEN_IMAGES_H
+#define MUGEN_IMAGES_H
+
+#ifdef __cplusplus
+#include <cstddef>
+#define IMAGE_VAR images
+namespace Mugen {
+
+  constexpr size_t IMAGE_SIZE = @IMAGE_SIZE;
+  constexpr size_t N_IMAGES = @N_IMAGES;
+#else
+#define IMAGE_VAR mugen_images
+#define IMAGE_SIZE @IMAGE_SIZE
+#define N_IMAGES @N_IMAGES
+#endif
+
+  extern unsigned char const IMAGE_VAR[N_IMAGES][IMAGE_SIZE];
+
+#ifdef __cplusplus
+}
+#endif
+#endif // MUGEN_IMAGES_H
+)";
+
+
+std::string source = R"(
+#include "@HEADER_FILE"
+#ifdef __cplusplus
+namespace Mugen {
+#endif
+
+  unsigned char const IMAGE_VAR[N_IMAGES][IMAGE_SIZE] = {
+@ARRAYS
+  };
+
+#ifdef __cplusplus
+}
+#endif
+)";
+
+
+Mugen::WriteResult Mugen::CPPWriter::write(Result const &result) {
+  std::string const headerFilename = std::filesystem::path(_filename).replace_extension(".h").string();
+  size_t const nImages = result.images.size();
+  size_t const nBytes = (1 << result.address.total_address_bits);
+
+  // Generate array-string
+  std::ostringstream oss;
+  for (size_t idx = 0; idx != nImages; ++idx) {
+    oss << "    {\n      ";
+    for (size_t byte = 0; byte != nBytes; ++byte) {
+      oss << std::setw(3) << std::setfill(' ') << (int)result.images[idx][byte] << ", ";
+      if ((byte + 1) % 20 == 0) oss << "\n      ";
+    }
+    oss << "\n    },\n";
+  }
+
+  // lambda to replace markers in the source templates
+  auto replaceMarker = [&](std::string &target, std::string const &marker, std::string const &replacement) {
+    auto pos = target.find(marker);  
+    while (pos != std::string::npos) {
+      target.replace(pos, marker.length(), replacement);
+      pos = target.find(marker);
+    }
+  };
+
+  // Replace markers
+  replaceMarker(header, "@IMAGE_SIZE", std::to_string(nBytes));
+  replaceMarker(header, "@N_IMAGES", std::to_string(nImages));
+  
+  replaceMarker(source, "@HEADER_FILE", headerFilename);
+  replaceMarker(source, "@IMAGE_SIZE", std::to_string(nBytes));
+  replaceMarker(source, "@N_IMAGES", std::to_string(nImages));
+  replaceMarker(source, "@ARRAYS", oss.str());
+
+  // Write to files
+  std::ofstream sourceFile(_filename);
+  if (!sourceFile) {
+    std::cerr << "ERROR: could not open " << _filename << " for writing.\n";
+    return {false, ""};
+  }
+
+  std::ofstream headerFile(headerFilename);
+  if (!headerFile) {
+    std::cerr << "ERROR: could not open " << headerFilename << " for writing.\n";
+    return {false, ""};
+  }
+
+  sourceFile << source;
+  headerFile << header;
+
+  std::ostringstream report;
+  report << "Successfully created CPP source files: "
+	 <<  _filename << ", " << headerFilename << ".";
+  
+  return {true, report.str()};
+}
+
