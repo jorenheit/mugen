@@ -1,6 +1,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <algorithm>
+
 #include "mugen.h"
 
 template <typename Tuple>
@@ -14,6 +16,8 @@ struct FindWriter<std::tuple<TupleTypes ...>> {
     };
 
     std::string ext = std::filesystem::path(filename).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
     for (size_t idx = 0; idx != sizeof...(TupleTypes); ++idx) {
       auto vec = ptrs[idx]->extensions();
       for (std::string const &str: vec) {
