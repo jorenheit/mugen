@@ -6,8 +6,8 @@
 int printHelp(std::string const &progName, int ret = 0) {
   std::cout << "Usage: " << progName << " <specification-file (.mu)> <output-file> [OPTIONS]\n\n"
 	    << "Supported output-file extensions:\n"
-	    << "  .bin, .rom           -> Generate binary file.\n"
-	    << "  .c, .cpp, .cc, .cxx  -> Generate C/C++ source file\n"
+	    << "  .bin, .rom           -> Generate binary file(s).\n"
+	    << "  .c, .cpp, .cc, .cxx  -> Generate C/C++ source files\n"
 	    << "\n"
             << "Options:\n"
             << "  -h, --help       Display this help message and exit\n"
