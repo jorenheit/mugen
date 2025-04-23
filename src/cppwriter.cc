@@ -92,8 +92,6 @@ Mugen::WriteResult Mugen::CPPWriter::write(Result const &result) {
 
   replaceMarker(source, "@SPEC_FILE", specFilename);
   replaceMarker(source, "@HEADER_FILE", std::filesystem::path(headerFilename).filename().string());
-  replaceMarker(source, "@IMAGE_SIZE", std::to_string(nBytes));
-  replaceMarker(source, "@N_IMAGES", std::to_string(nImages));
   replaceMarker(source, "@ARRAYS", oss.str());
 
   // Write to files
