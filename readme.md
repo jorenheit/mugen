@@ -117,7 +117,7 @@ Alternatively, flags may be named. This has the benefit of self-documentation wi
 ```
 
 #### Segments
-The address space may be segmented to allow for groups of 8 control signals to be stored in different segments of the same chip. The hardware must then be designed to sequentially load these signals from the different segments by enabling the corresponding segment bits. For example, when using 2 segment bits (4 segments), 24 signals can be stored on the same chip.
+The address space may be segmented to allow for groups of 8 control signals to be stored in different segments of the same chip. The hardware must then be designed to sequentially load these signals from the different segments by enabling the corresponding segment bits. For example, when using 2 segment bits (4 segments), 32 signals can be stored on the same chip.
 
 ```
 [address] {
@@ -129,7 +129,7 @@ The address space may be segmented to allow for groups of 8 control signals to b
 ```
 
 #### Padding
-By default, Mugen will create images of size `2^(sum of bis)` based on the specified bits in the address section. When not all address lines are used, this will result in images smaller than the actual number of words available on the ROM (see rom-section) to minimize the time needed to flash the images to the chip(s). The `--pad` or `-p` option can be passed to Mugen to pad the remaining address-space with some hex value:
+By default, Mugen will create images of size `2^(sum of bits)` based on the specified bits in the address section. When not all address lines are used, this will result in images smaller than the actual number of words available on the ROM (see rom-section) to minimize the time needed to flash the images to the chip(s). The `--pad` or `-p` option can be passed to Mugen to pad the remaining address-space with some hex value:
 
 ```sh
 mugen spec.mu image.bin --pad 0xff
@@ -138,7 +138,7 @@ mugen spec.mu image.bin --pad 0xff
 Alternatively, `--pad catch` can be used (only) when a catch-rule was specified in the microcode section (see below). With this option, the catch-rule will also be applied to all addresses outside the addressable space of the ROM. 
 
 ### Signals
-Defines all control signals used in the microcode. Each signal must be a valid identifier (a combination of alphanumeric characters or underscores) and be listed on a seperate line. At most 64 signals may be declared.
+This section lists all control signals used in the microcode. Each signal must be a valid identifier (a combination of alphanumeric characters or underscores) and be listed on a seperate line. At most 64 signals may be declared.
 
 ```
 [signals] {
@@ -156,7 +156,7 @@ Defines all control signals used in the microcode. Each signal must be a valid i
 Signals are grouped into chunks of 8. The first chunk will be stored to the first chip, the second to the second chip and so on. When the chips have been segmented, sequential chunks are first stored in segment 0 of the corresponding ROM chips, then to segment 1 and so on. Given `n` available ROM chips, a chunk with index `c` will be stored in ROM `floor(c / n)`, segment `mod(c, n)`. Signals are stored starting from the least significant bit, unless  Mugen is called with the `--msb-first` or `-m` flag. Call Mugen with the `--layout` option for an overview of where each of signals has ended up. 
 
 ### Opcodes
-Defines the available opcodes and assigns their numerical values (in hex). Each opcode must be defined on its own line.
+This section defines the available opcodes and assigns their numerical values (in hex). Each opcode must be defined on its own line.
 
 ```
 [opcodes] {
@@ -168,7 +168,7 @@ Defines the available opcodes and assigns their numerical values (in hex). Each 
 ```
 
 ### Microcode Definitions
-Describes the control signals for each instruction cycle. Each line specificies the opcode, cycle and flag configuration followed by `->` and a list of control signals (which may be empty). Wildcards denoted `x` will be matched to any opcode, any cycle number within the specified range or either 0 or 1 in the case of the flags.
+The final section sets the control signals for each instruction cycle. Each line specificies the opcode, cycle and flag configuration followed by `->` and a list of control signals (which may be empty). Wildcards denoted `x` will be matched to any opcode, any cycle number within the specified range or either 0 or 1 in the case of the flags.
 
 ```
 [microcode] {
