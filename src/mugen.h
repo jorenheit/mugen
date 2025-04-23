@@ -81,18 +81,29 @@ namespace Mugen {
     static std::unique_ptr<Writer> get(std::string const &filename);
     virtual WriteResult write(Result const &result) = 0;
     virtual std::vector<std::string> extensions() const = 0;
+    virtual std::string format() const = 0;
   };
 
   struct BinaryFileWriter: public Writer {
     using Writer::Writer;
     virtual WriteResult write(Result const &result) override;
-    virtual std::vector<std::string> extensions() const override;
+    virtual std::vector<std::string> extensions() const override {
+      return {".bin", ".rom"};
+    }
+    virtual std::string format() const override {
+      return "Binary file";
+    }
   };
 
   struct CPPWriter: public Writer {
     using Writer::Writer;
     virtual WriteResult write(Result const &result) override;
-    virtual std::vector<std::string> extensions() const override;
+    virtual std::vector<std::string> extensions() const override {
+      return {".cc", ".cpp", ".cxx", ".c"};
+    }
+    virtual std::string format() const override {
+      return "C/C++ Source Code";
+    }
   };
 
   using Writers = std::tuple<BinaryFileWriter, CPPWriter>;

@@ -4,10 +4,6 @@
 
 #include "mugen.h"
 
-std::vector<std::string> Mugen::BinaryFileWriter::extensions() const {
-  return {".bin", ".rom"};
-}
-
 Mugen::WriteResult Mugen::BinaryFileWriter::write(Result const &result) {
   std::vector<std::string> files;
   for (size_t idx = 0; idx != result.images.size(); ++idx) {

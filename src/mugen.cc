@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
   }
   
   if (writeResult) {
-    auto writer = Mugen::Writer::get(outFilename); // get a writer object based on the filename (extension)
+    auto writer = Mugen::Writer::get(outFilename);
     if (!writer) {
       std::cerr << "ERROR: unsupported file extension.\n\n";
       return printHelp(argv[0], 1);

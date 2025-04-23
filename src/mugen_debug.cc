@@ -172,17 +172,8 @@ namespace Mugen {
     };
     
     size_t nImages = result.images.size();
-    property("#images") << nImages << " -> ";
-    for (size_t idx = 0; idx != nImages; ++idx) {
-      std::cout << outFileBase;
-      if (nImages > 1) {
-        std::cout << ("." + std::to_string(idx));
-        if (idx != nImages - 1) {
-          std::cout << ", ";
-        }
-      }
-    }
-    std::cout << "\n";
+    property("#images") << nImages << '\n';
+    property("file format") << Writer::get(outFileBase)->format() << '\n';
     
     property("image size") << result.images[0].size() << " bytes (";
     if (result.images[0].size() <= (1UL << result.address.total_address_bits)) {
