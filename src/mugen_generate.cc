@@ -444,7 +444,7 @@ namespace Mugen {
     
     while (std::getline(iss, line)) {
       trim(line);
-      if (line.empty()) {
+      if (line.empty() || catchRuleDefined) {
         ++_lineNr;
         continue;
       }
