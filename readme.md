@@ -201,7 +201,7 @@ It might be useful to fill all yet undefined addresses with some kind of error-s
 }
 ```
 
-Only the catch rule is allowed to overlap with preceding rules. On every other rule an error will be raised when it is found to overlap with previously defined rules. Any normal rule following a catch-rule will always collide with the catch itself. Therefore the catch-rule should always come at the end of the microcode section.
+Only the catch rule is allowed to overlap with preceding rules. On every other rule an error will be raised when it is found to overlap with previously defined rules. Any normal rule following a catch-rule will always collide with the catch itself and is ignored to allow for an early return (equivalent to commenting out everything below the catch).
 
 ```
 [microcode] {
@@ -211,7 +211,7 @@ Only the catch rule is allowed to overlap with preceding rules. On every other r
     # ...
     catch    -> ERR, HLT # won't collide by definition
 
-    # Anything below the catch will collide
+    # Anything below the catch will be ignored
 }
 ```
 
