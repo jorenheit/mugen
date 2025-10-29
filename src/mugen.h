@@ -34,6 +34,7 @@ namespace Mugen {
 
   using Opcodes = std::unordered_map<std::string, size_t>;
   using Signals = std::vector<std::string>;
+  using Macros  = std::unordered_map<std::string, Signals>;
   using Image = std::vector<unsigned char>;
 
   struct Options {
@@ -55,6 +56,7 @@ namespace Mugen {
     Opcodes opcodes;
     AddressMapping address;
     Signals signals;
+    Macros macros;
     RomSpecs rom;
     bool lsbFirst;
 

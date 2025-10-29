@@ -10,6 +10,8 @@
 #include "util.h"
 
 namespace Mugen {
+
+  static std::string const s_empty = "__EMPTY__";
   
   struct Body {
     std::string str;
@@ -72,9 +74,16 @@ namespace Mugen {
         ++_lineNr;
         continue;
       }
+
+      if (ident[0] == '-') {
+	error_if(ident.size() > 1,
+		 "expected signal identifier or dash ('-') to declare an empty signal.");
+	
+	ident = s_empty;
+      }
       
       validateIdentifier(ident);
-      error_if(std::find(signals.begin(), signals.end(), ident) != signals.end(),
+      error_if(ident != s_empty && std::find(signals.begin(), signals.end(), ident) != signals.end(),
                "duplicate definition of signal \"", ident, "\".");
       
       signals.push_back(ident);
@@ -157,7 +166,59 @@ namespace Mugen {
     return opcodes;
   }
   
-  
+  Macros parseMacros(Body const &body, Result const &result) {
+    std::istringstream iss(body.str);
+    Macros macros;
+    std::string line;
+    _lineNr = body.lineNr;
+    
+    while (std::getline(iss, line)) {
+      trim(line);
+      if (line.empty()) {
+        ++_lineNr;
+        continue;
+      }
+      
+      
+      std::vector<std::string> operands = split(line, '=');
+      error_if(operands.size() == 1,
+               "expected \"=\" in macro definition.");
+            
+      error_if(operands.size() != 2,
+               "incorrect opcode format, should be of the form <MACRO> = <SIGNAL1>, <SIGNAL2>, ...");
+
+      std::string ident = operands[0];
+      validateIdentifier(ident);
+      for (std::string const &signal: result.signals) {
+	error_if(ident == signal,
+		 "macro-identifier \"", ident, "\" clashes with previously defined signal \"", signal, "\".");
+      }
+
+      Signals macroSignals;
+      std::vector<std::string> rhs = split(operands[1], ',');
+      for (std::string const &signal: rhs) {
+        bool validSignal = false;
+        for (size_t idx = 0; idx != result.signals.size(); ++idx) {
+          if (result.signals[idx] != signal) continue;
+          validSignal = true;
+          break;
+        }
+
+        error_if(!validSignal && !macros.contains(signal),
+                 "signal \"", signal, "\" not declared in signal section.");
+
+	macroSignals.push_back(signal);
+      }
+
+      bool success = macros.insert({ident, macroSignals}).second;
+      error_if(!success,
+	       "duplicate definition of macro \"", ident, "\".");
+
+      ++_lineNr;
+    }
+
+    return macros;
+  }
   
   AddressMapping parseAddressMapping(Body const &body, Result const &result) {
     
@@ -277,7 +338,7 @@ namespace Mugen {
                "specified number of words (", values[0], ") is not a valid decimal number.");
       error_if(result.word_count <= 0,
                "specified number of words (", result.word_count, ") must be a positive integer.");
-      
+
       // Get bits per word
       error_if(!stringToInt(values[1], result.bits_per_word),
                "specified number of bits per word (", values[1], ") is not a valid decimal number.");
@@ -422,6 +483,7 @@ namespace Mugen {
     auto const &rom = result.rom;
     auto const &address = result.address;
     auto const &signals = result.signals;
+    auto const &macros  = result.macros;
     auto const &opcodes = result.opcodes;
     
     size_t const addressBits = (opt.padImages == Options::Padding::CATCH)
@@ -460,7 +522,7 @@ namespace Mugen {
       std::string addressString(addressBits, 'x');
       
       // Lambda for inserting bits into the address-string
-      auto insertIntoAddressString = [&addressString](std::string const &bitString, int bits_start) {
+      auto insertIntoAddressString = [&addressString](std::string const &bitString, int bits_start) -> void {
         addressString.replace(addressString.length() - bits_start - bitString.length(), bitString.length(), bitString);
       };
       
@@ -503,9 +565,45 @@ namespace Mugen {
           
           insertIntoAddressString(cycleStr, address.cycle_bits_start);
         }
-        
+
+	
         // Insert flag bits
         std::string flagStr = lhs[2];
+	if (!flagStr.empty() && flagStr[0] == '(') {
+	  size_t endPos = flagStr.find(')');
+	  error_if(endPos == std::string::npos,
+		   "expected ')' in state specification.");
+
+	  std::string result = std::string(address.flag_bits, 'x');
+	  std::vector<std::string> flagStates = split(flagStr.substr(1, endPos - 1), ',');
+	  for (std::string const &str: flagStates) {
+	    std::vector<std::string> state = split(str, '=');
+	    error_if(state.size() != 2,
+		     "invalid format in state specification, should be of the form (A=0,B=1).");
+
+	    size_t flagIndex = -1;
+	    for (size_t idx = 0; idx != address.flag_labels.size(); ++idx) {
+	      if (state[0] == address.flag_labels[idx]) {
+		flagIndex = idx;
+		break;
+	      }
+	    }
+	    error_if(flagIndex == -1UL,
+		     "unknown flag identifier \"", state[0], "\".");
+
+
+	    int value;
+	    error_if(!stringToInt(state[1], value),
+		     "expected integer but got \"", state[1], "\".");
+	    error_if(value != 0 && value != 1,
+		     "expected either '0' or '1' as the value of flag \"", state[0], "\".");
+
+	    result[flagIndex] = value ? '1' : '0';
+	  }
+
+	  flagStr.swap(result);
+	}
+	
         error_if(flagStr.length() != address.flag_bits, 
                  "number of flag bits (", flagStr.length(), ") does not match number of flag bits "
                  "defined in the address section (", address.flag_bits, ").");
@@ -526,9 +624,28 @@ namespace Mugen {
         catchAll = (addressString == std::string(rom.address_bits, 'x'));
       }
       if (catchAll) catchRuleDefined = true;
-            
-      // Construct control signal bitvector                   
+
+
+      // Replace macro's with their signals
       std::vector<std::string> rhs = split(operands[1], ',');
+      bool done = false;
+      while (!done) {
+	std::vector<std::string> tmp;
+	done = true;
+	for (std::string const &ident: rhs) {
+	  if (macros.contains(ident)) {
+	    tmp.insert(tmp.end(), macros.at(ident).begin(), macros.at(ident).end());
+	    done = false;
+	  }
+	  else {
+	    tmp.push_back(ident);
+	  }
+	}
+	
+	rhs.swap(tmp);
+      }
+
+      // Construct control signal bitvector                   
       size_t bitvector = 0;
       for (std::string const &signal: rhs) {
         bool validSignal = false;
@@ -540,9 +657,9 @@ namespace Mugen {
           validSignal = true;
           break;
         }
-        
+	
         error_if(!validSignal,
-                 "signal \"", signal, "\" not declared in signal section.");
+                 "signal \"", signal, "\" not declared in signal or macro section.");
       }
       
       
@@ -601,7 +718,7 @@ namespace Mugen {
     
     // Raise a warning on unused signals
     for (size_t idx = 0; idx != signals.size(); ++idx) 
-      warning_if(!signalsUsed[idx],
+      warning_if(!signalsUsed[idx] && signals[idx] != s_empty,
                  "unused signal \"", signals[idx], "\".");
     
     // Raise a warning when padding with catch is enabled but no catch rule was defined
@@ -631,7 +748,8 @@ namespace Mugen {
         oss << "  [ROM " << i << ", Segment " << j << "] {\n";
         for (size_t k = 0; k != 8; ++k) {
           size_t signalIdx = chunkIdx + (result.lsbFirst ? k : (7 - k));
-          oss << "    " << k << ": " << (signalIdx < result.signals.size() ? result.signals[signalIdx] : "UNUSED") << '\n';
+	  std::string name = (signalIdx < result.signals.size() ? result.signals[signalIdx] : "UNUSED");
+          oss << "    " << k << ": " << (name != s_empty ? name : "UNUSED") << '\n';
         }
         oss << "  }\n\n";
       }
@@ -678,11 +796,18 @@ namespace Mugen {
       {"address", false},
       {"microcode", false}
     };
+
+    std::unordered_map<std::string, bool> optionalSections{
+      {"macros", false}
+    };
     
     auto sections = parseTopLevel(file);
     for (auto const &[name, body]: sections) {
       if (requiredSections.contains(name)) {
         requiredSections[name] = true;
+      }
+      else if (optionalSections.contains(name)) {
+        optionalSections[name] = true;
       }
       else {
         _lineNr = body.lineNr;
@@ -700,6 +825,8 @@ namespace Mugen {
     result.rom      = parseRomSpecs(sections["rom"]);
     result.address  = parseAddressMapping(sections["address"], result);
     result.signals  = parseSignals(sections["signals"], result);
+    if (optionalSections["macros"])
+	result.macros   = parseMacros(sections["macros"], result);
     result.opcodes  = parseOpcodes(sections["opcodes"], result);
     result.images   = parseMicrocode(sections["microcode"], result, opt);
     result.lsbFirst = opt.lsbFirst;

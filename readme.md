@@ -66,7 +66,7 @@ When `--debug` or `-d` option is used, Mugen will start an interactive shell in 
 
 ## Specification File Format
 
-A Mugen specification file (.mu) consists of the following sections: signals, opcodes, microcode, address and rom. Outside sections, only comments are permitted. Comments start with a `#` and end at the end of the line.
+A Mugen specification file (.mu) contains the following sections: `signals`, `opcodes`, `macros`, `microcode`, `address` and `rom`. Only the `macros` section is optional; all other sections must appear somewhere in the .mu-file, but the order in which they do is left up to the user. Outside these sections, only comments are permitted. Comments start with a `#` and end at the end of the line.
 
 ### ROM Configuration
 Defines ROM parameters (number of words and bits per word). Currently only 8 bit ROM is supported. 
@@ -102,11 +102,8 @@ Address Bit: 13 12 11 10 09 08 07 06 05 04 03 02 01 00
               X  X  X  X  X  F  F  O  O  O  O  C  C  C
 ```
 
-#### No Flags
-It is possible to define a system where no flags are used (for example when building Ben Eater's 8-bit computer, it is possible to run it in an intermediate stage where it is not Turing Complete yet). Simply assign 0 bits to the flag field of the address or omit the flag-line altogether.
-
 #### Named Flags
-Alternatively, flags may be named. This has the benefit of self-documentation with respect to the order of the flags in the specification itself. Furthermore, when using the `--layout` option, the provided flag-names will be printed for clarity.
+Alternatively, flags may be named. This has the benefit of self-documentation with respect to the order of the flags in the specification itself. Furthermore, it allows you to use a more explicit syntax in the microcode definitions and, when in debug-mode or when using the `--layout` option, the flag-names will be printed for clarity.
 
 ```
 [address] {
@@ -115,6 +112,11 @@ Alternatively, flags may be named. This has the benefit of self-documentation wi
     flags:  C, Z # equivalent to 'flags: 2'
 }
 ```
+
+
+#### No Flags
+It is possible to define a system where no flags are used (for example when building Ben Eater's 8-bit computer, it is possible to run it in an intermediate stage where it is not Turing Complete yet). Simply assign 0 bits to the flag field of the address or omit the flag-line altogether.
+
 
 #### Segments
 The address space may be segmented to allow for groups of 8 control signals to be stored in different segments of the same chip. The hardware must then be designed to sequentially load these signals from the different segments by enabling the corresponding segment bits. For example, when using 2 segment bits (4 segments), 32 signals can be stored on the same chip.
@@ -152,6 +154,21 @@ This section lists all control signals used in the microcode. Each signal must b
 }
 ```
 
+#### Empty Slots
+To create an empty slot (an unconnected pin in hardware), simply put a single dash (-) in the corresponding location of the list.
+```
+[signals] {
+    HLT
+    MI
+    RI
+    -     # empty
+    IO
+    II
+    #...
+}
+```
+
+
 #### Signal Indices
 Signals are grouped into chunks of 8. The first chunk will be stored to the first chip, the second to the second chip and so on. When the chips have been segmented, sequential chunks are first stored in segment 0 of the corresponding ROM chips, then to segment 1 and so on. Given `n` available ROM chips, a chunk with index `c` will be stored in ROM `floor(c / n)`, segment `mod(c, n)`. Signals are stored starting from the least significant bit, unless  Mugen is called with the `--msb-first` or `-m` flag. Call Mugen with the `--layout` option for an overview of where each of signals has ended up. 
 
@@ -167,27 +184,64 @@ This section defines the available opcodes and assigns their numerical values (i
 }
 ```
 
+### Macro's
+It is very common for certain clusters of control signals to appear again and again because these represent some common operation that requires multiple signals to be asserted at the same time. The optional `macro` section allows you to define these clusters and name them appropriately. These macro names can then be used instead of (or in conjunction with) the signals previously defined in the `signals` section.
+```
+[macros] {
+  # Register Select
+  R_D  = RS0
+  R_DP = RS1
+  R_SP = RS0, RS1
+  R_IP = RS2
+  R_LS = RS0, RS2
+
+  # Modify Data
+  INC_D = INC, R_D, SET_V   # using macro R_D as an alias for RS0
+  DEC_D = DEC, R_D, SET_V
+  
+  # ...
+}
+```
+
 ### Microcode Definitions
-The final section sets the control signals for each instruction cycle. Each line specificies the opcode, cycle and flag configuration followed by `->` and a list of control signals (which may be empty). Wildcards denoted `x` will be matched to any opcode, any cycle number within the specified range or either 0 or 1 in the case of the flags.
+The final section sets the control signals for each instruction cycle. Each line specificies the opcode, cycle and flag configuration followed by `->` and a list of control signals (which may be empty) and/or macro's. Wildcards denoted `x` will be matched to any opcode, any cycle number within the specified range or either 0 or 1 in the case of the flags.
+
+#### Legacy Syntax
+In older versions of Mugen, the flag configuration was represented by a string of 0's, 1's and x's, which made it hard to parse for humans because they'd have to memorize the flag-order. This could get especially confusing when dealing with many flags. The order of the flag bits in these rule-definitions is exactly how they will appear on the address lines to the ROM. For example, the rule ADD:1:01 will map to a situation where bit 0 of the flag-field is 1 and bit 1 is 0. If using named flags, the order is determined by the order in which the flags were declared in the address-section.
 
 ```
 [microcode] {
-    x:0:xx -> MI, CO
-    x:1:xx -> RO, II, CE
-		
-    NOP:2:xx ->
-    NOP:3:xx ->
-    NOP:4:xx ->
-		
-    LDA:2:xx -> MI, IO
-    LDA:3:xx -> RO, AI
-    LDA:4:xx ->
+  # ...
 
-    # ...
+  PLUS:1:xx00x          -> INC, RS0, SET_V, LD_FA
+  PLUS:2:xx00x          -> INC, RS2, CR
+  PLUS:1:xx10x          -> LD_D, OE_RAM
+  PLUS:2:xx10x          -> INC, RS0, SET_V, LD_FA
+  PLUS:3:xx10x          -> INC, RS2, CR
+  PLUS:1:xxx1x          -> INC, RS2, CR
+
+  # ...
 }
 ```
-#### Order of Flag Bits
-The order of the flag bits in the rule-definitions is exactly how they will appear on the address lines to the ROM. For example, the rule PLUS:1:01 will map to a situation where bit 0 of the flag-field is 1 and bit 1 is 0. If using named flags, the order is determined by the order in which the flags were declared in the address-section.
+
+#### New Syntax
+In current versions of Mugen, flag states can be made more explicit using the syntax below. In this new syntax, flags that have no value assigned to them are treated as wildcards. Empty brackets will therefore match any configuration. For this syntax to work, named flags should have been defined in the `address` section.
+
+```
+  # ...
+
+  PLUS:1:(A=0,S=0)		-> INC, RS0, SET_V, LD_FA
+  PLUS:2:(A=0,S=0)		-> INC, RS2, CR
+  PLUS:1:(A=1,S=0)		-> LD_D, OE_RAM
+  PLUS:2:(A=1,S=0)		-> INC, RS0, SET_V, LD_FA
+  PLUS:3:(A=1,S=0)		-> INC, RS2, CR
+  PLUS:1:(S=1)			-> INC, RS2, CR
+
+  # ...
+  
+  NOP:x:()              -> # Any cycle, any state, do nothing
+```
+
 
 #### catch
 It might be useful to fill all yet undefined addresses with some kind of error-signal to indicate that the computer ended up in some undefined state. This can be done using wildcards or the reserved `catch` keyword. In either case below, all remaining cells will be assigned the ERR and HLT signal.
@@ -196,8 +250,9 @@ It might be useful to fill all yet undefined addresses with some kind of error-s
 [microcode] {
     # all previous rules
     
-    catch -> ERR, HLT
+    catch    -> ERR, HLT
     x:x:xxxx -> ERR, HLT   # this is equivalent
+	x:x:()   -> ERR, HLT   # and this too
 }
 ```
 
