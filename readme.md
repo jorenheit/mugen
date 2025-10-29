@@ -282,7 +282,7 @@ When the system has no flag bits mapped onto the address (i.e. the flag field in
 ```
 
 ## Example
-When Mugen is run on the unsegmented BFCPU specification in the examples-folder of this repository, the following output is generated:
+When Mugen is run on the BFCPU specification in the examples-folder of this repository, the following output is generated:
 
 ```
 $ mugen bfcpu.mu bfcpu.bin --pad catch --layout
