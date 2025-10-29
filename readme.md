@@ -285,58 +285,60 @@ When the system has no flag bits mapped onto the address (i.e. the flag field in
 When Mugen is run on the unsegmented BFCPU specification in the examples-folder of this repository, the following output is generated:
 
 ```
-$ mugen bfcpu.mu bfcpu.bin --layout
+$ mugen bfcpu.mu bfcpu.bin --pad catch --layout
 Successfully generated 3 images from bfcpu.mu: 
-  ROM 0 : bfcpu.bin.0 (2048 bytes)
-  ROM 1 : bfcpu.bin.1 (2048 bytes)
-  ROM 2 : bfcpu.bin.2 (2048 bytes)
 
-[ROM 0, Segment 0] {
-  0: HLT
-  1: RS0
-  2: RS1
-  3: RS2
-  4: INC
-  5: DEC
-  6: DPR
-  7: EN_SP
-}
+  ROM 0: bfcpu.bin.0 (8192 bytes)
+  ROM 1: bfcpu.bin.1 (8192 bytes)
+  ROM 2: bfcpu.bin.2 (8192 bytes)
 
-[ROM 1, Segment 0] {
-  0: OE_RAM
-  1: WE_RAM
-  2: EN_IN
-  3: EN_OUT
-  4: VE
-  5: AE
-  6: LD_FB
-  7: LD_FA
-}
 
-[ROM 2, Segment 0] {
-  0: EN_IP
-  1: LD_IP
-  2: EN_D
-  3: LD_D
-  4: CR
-  5: ERR
-  6: UNUSED
-  7: UNUSED
-}
+  [ROM 0, Segment 0] {
+    0: HLT
+    1: RS0
+    2: RS1
+    3: RS2
+    4: INC
+    5: DEC
+    6: DPR
+    7: EN_SP
+  }
 
-[Address Layout] {
-  0: CYCLE 0
-  1: CYCLE 1
-  2: CYCLE 2
-  3: OPCODE 0
-  4: OPCODE 1
-  5: OPCODE 2
-  6: OPCODE 3
-  7: Z
-  8: S
-  9: A
-  10: V
-  11: UNUSED
-  12: UNUSED
-}
+  [ROM 1, Segment 0] {
+    0: OE_RAM
+    1: WE_RAM
+    2: EN_IN
+    3: EN_OUT
+    4: EN_V
+    5: EN_A
+    6: LD_FBI
+    7: LD_FA
+  }
+
+  [ROM 2, Segment 0] {
+    0: EN_IP
+    1: LD_IP
+    2: EN_D
+    3: LD_D
+    4: CR
+    5: CLR_K
+    6: UNUSED
+    7: ERR
+  }
+
+  [Address Layout] {
+    0: CYCLE BIT 0
+    1: CYCLE BIT 1
+    2: CYCLE BIT 2
+    3: OPCODE BIT 0
+    4: OPCODE BIT 1
+    5: OPCODE BIT 2
+    6: OPCODE BIT 3
+    7: Z
+    8: S
+    9: A
+    10: V
+    11: K
+    12: UNUSED
+  }
 ```
